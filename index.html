@@ -123,6 +123,12 @@ details.grp > .body { padding: 0 12px 4px; }
 #authOverlay .box { background: var(--card); border-radius: 16px; padding: 22px; width: 100%; max-width: 360px; }
 #toast { position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%); background: #111; color: #fff; padding: 10px 16px; border-radius: 20px; font-size: 13px; z-index: 999; display: none; max-width: 90vw; text-align: center; }
 .auth-logo { display: block; width: 200px; max-width: 70%; margin: 0 auto 10px; }
+.chk { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 10px 0; cursor: pointer; }
+.chk input { width: auto; display: inline-block; transform: scale(1.3); }
+.ds-resumo { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--bg); font-size: 13px; line-height: 1.6; }
+.ds-resumo b { color: var(--navy); }
+html[data-dark="1"] .ds-resumo b { color: #fff; }
+.ds-aviso { color: var(--danger); font-weight: 700; }
 .logo-prev { max-height: 60px; max-width: 200px; display: block; margin: 6px 0; }
 </style>
 </head>
@@ -179,7 +185,7 @@ details.grp > .body { padding: 0 12px 4px; }
       <div><label class="fld">Telefone / WhatsApp</label><input id="edCliTel" type="tel" inputmode="tel" placeholder="(00) 00000-0000"></div>
       <div><label class="fld">CPF / CNPJ</label><input id="edCliDoc" inputmode="numeric"></div>
     </div>
-    <label class="fld">Endereço da obra</label><input id="edCliEnd">
+    <label class="fld">Endereço da obra</label><input id="edCliEnd" oninput="if(cur)resumoDesloc()">
   </div>
 
   <div class="card">
@@ -192,9 +198,30 @@ details.grp > .body { padding: 0 12px 4px; }
     <div class="section-title">Materiais e mão de obra</div>
     <div id="edItens"></div>
     <button class="btn btn-primary btn-block" onclick="abrirPicker()">+ Adicionar item do catálogo</button>
-    <div style="margin-top:14px">
+  </div>
+
+  <div class="card">
+    <div class="section-title">Deslocamento</div>
+    <p class="muted" id="dsOrigem"></p>
+    <button class="btn btn-ghost btn-block btn-sm" style="margin-top:6px" onclick="abrirRota()">📍 Ver rota e distância no Google Maps</button>
+    <div class="row">
+      <div><label class="fld">Distância só de ida (km)</label><input id="dsKm" inputmode="decimal" placeholder="0" oninput="calcTotais()"></div>
+      <div><label class="fld">Tempo só de ida (min)</label><input id="dsMin" inputmode="numeric" placeholder="0" oninput="calcTotais()"></div>
+    </div>
+    <div class="row" style="align-items:flex-end">
+      <div><label class="fld">Nº de viagens</label><input id="dsViagens" type="number" inputmode="numeric" min="1" value="1" oninput="calcTotais()"></div>
+      <div><label class="chk"><input type="checkbox" id="dsIdaVolta" checked onchange="calcTotais()"> Cobrar ida e volta</label></div>
+    </div>
+    <div class="ds-resumo" id="dsResumo"></div>
+    <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="atualizarCustosVeiculo()">↻ Usar custos atuais do veículo</button>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Totais</div>
+    <div>
       <div class="tot"><span>Materiais</span><span id="tMat">—</span></div>
       <div class="tot"><span>Mão de obra / serviços</span><span id="tSrv">—</span></div>
+      <div class="tot"><span>Deslocamento</span><span id="tDesl">—</span></div>
       <div class="tot"><span>Subtotal</span><span id="tSub">—</span></div>
       <div class="row" style="align-items:flex-end">
         <div><label class="fld">Desconto</label><input id="edDesc" inputmode="decimal" placeholder="0,00" oninput="calcTotais()"></div>
@@ -262,6 +289,33 @@ details.grp > .body { padding: 0 12px 4px; }
     <label class="fld">Forma de pagamento</label><input id="empPagto" placeholder="Ex.: PIX ou cartão">
     <label class="fld">Observações padrão</label><textarea id="empObs"></textarea>
     <button class="btn btn-success btn-block" style="margin-top:12px" onclick="salvarEmpresa()">Salvar dados da empresa</button>
+  </div>
+  <div class="card">
+    <div class="section-title">Veículo e custo de deslocamento</div>
+    <p class="muted">Usados para calcular o deslocamento de cada orçamento: <b>combustível + depreciação + manutenção</b> por km rodado, mais o tempo de viagem. Confira os valores com os dados reais do veículo.</p>
+    <div class="row">
+      <div><label class="fld">Veículo</label><input id="vModelo"></div>
+      <div><label class="fld">Combustível</label><select id="vComb"><option value="etanol">Etanol</option><option value="gasolina">Gasolina</option></select></div>
+    </div>
+    <label class="fld">Endereço de saída</label><input id="vOrigem" placeholder="Bairro, cidade - UF">
+    <div class="row">
+      <div><label class="fld">Preço do combustível (R$/litro)</label><input id="vPreco" inputmode="decimal" placeholder="Preço na bomba" oninput="resumoVeiculo()"></div>
+      <div><label class="fld">Consumo médio (km/l)</label><input id="vConsumo" inputmode="decimal" placeholder="Ex.: 8 a 9 etanol, 10 a 12 gasolina" oninput="resumoVeiculo()"></div>
+    </div>
+    <div class="row">
+      <div><label class="fld">Valor do veículo — Tabela FIPE (R$)</label><input id="vValor" inputmode="decimal" placeholder="veiculos.fipe.org.br" oninput="resumoVeiculo()"></div>
+      <div><label class="fld">Depreciação ao ano (%)</label><input id="vDeprec" inputmode="decimal" placeholder="Ex.: 5" oninput="resumoVeiculo()"></div>
+    </div>
+    <div class="row">
+      <div><label class="fld">Km rodados por ano</label><input id="vKmAno" inputmode="numeric" placeholder="Ex.: 20000" oninput="resumoVeiculo()"></div>
+      <div><label class="fld">Manutenção e pneus (R$/km)</label><input id="vManut" inputmode="decimal" placeholder="Ex.: 0,15" oninput="resumoVeiculo()"></div>
+    </div>
+    <div class="row">
+      <div><label class="fld">Valor da hora em viagem (R$/h)</label><input id="vHora" inputmode="decimal" placeholder="0 = não cobra o tempo" oninput="resumoVeiculo()"></div>
+      <div><label class="fld">Deslocamento mínimo (R$)</label><input id="vMinimo" inputmode="decimal" placeholder="0 = sem mínimo" oninput="resumoVeiculo()"></div>
+    </div>
+    <div class="ds-resumo" id="vResumo"></div>
+    <button class="btn btn-success btn-block" style="margin-top:12px" onclick="salvarEmpresa()">Salvar veículo</button>
   </div>
   <div class="card" id="contaCard" style="display:none">
     <div class="section-title">Conta</div>
@@ -500,11 +554,36 @@ function gruposOrdenados(list) {
   Array.from(set).filter(g => GRUPOS.indexOf(g) < 0).sort((a, b) => a.localeCompare(b, 'pt-BR')).forEach(g => ord.push(g));
   return ord;
 }
+/* Veículo: o que o dono informou (Fiat Strada 2010, saída de Nova Carapina — Serra/ES).
+   Valores numéricos ficam em 0 até a empresa preencher: não há preço inventado. */
+const VEICULO_PADRAO = { modelo: 'Fiat Strada 2010', comb: 'etanol', origem: 'Nova Carapina, Serra - ES',
+  precoComb: 0, consumo: 0, valor: 0, deprecAno: 0, kmAno: 0, manutKm: 0, valorHora: 0, minimo: 0 };
+function normEmp(e) { const r = Object.assign({}, EMPRESA_PADRAO, e || {}); r.veiculo = Object.assign({}, VEICULO_PADRAO, (e && e.veiculo) || {}); return r; }
+/* Custo por km = combustível (preço ÷ consumo) + depreciação (valor × % ao ano ÷ km por ano) + manutenção */
+function custoKm(v) {
+  v = v || {};
+  const comb = num(v.consumo) > 0 ? num(v.precoComb) / num(v.consumo) : 0;
+  const dep = num(v.kmAno) > 0 ? num(v.valor) * num(v.deprecAno) / 100 / num(v.kmAno) : 0;
+  const man = num(v.manutKm);
+  return { comb, dep, man, total: Math.round((comb + dep + man) * 10000) / 10000 };
+}
+/* Parâmetros copiados para o orçamento: mudar o veículo depois não altera orçamentos já feitos */
+function paramsDesloc() { const v = EMP.veiculo || VEICULO_PADRAO; return { custoKm: custoKm(v).total, valorHora: num(v.valorHora), minimo: num(v.minimo), origem: v.origem || '', em: hojeISO() }; }
+function calcDesloc(d) {
+  const z = { km: 0, horas: 0, valor: 0, porKm: 0, porHora: 0, mult: 1, minimo: false };
+  if (!d || !(num(d.km) > 0)) return z;
+  const mult = (d.idaVolta === false ? 1 : 2) * Math.max(1, parseInt(d.viagens, 10) || 1);
+  const km = Math.round(num(d.km) * mult * 10) / 10;
+  const horas = num(d.min) * mult / 60;
+  const porKm = round2(km * num(d.custoKm)), porHora = round2(horas * num(d.valorHora));
+  const calc = round2(porKm + porHora), min = num(d.minimo);
+  return { km, horas, mult, porKm, porHora, valor: Math.max(calc, min), minimo: min > calc };
+}
 const EMPRESA_PADRAO = { nome: 'Barragem', cnpj: '', tel: '', email: '', end: '', resp: '', logo: '', validade: 15, garantia: '', pagto: '', obs: '', updatedAt: 0 };
 
 let ORCS = [];
 let CAT = { list: [], updatedAt: 0 };
-let EMP = Object.assign({}, EMPRESA_PADRAO);
+let EMP = normEmp({});
 let cur = null;           // orçamento em edição
 let formDirty = false;
 let pickSel = null;
@@ -547,7 +626,7 @@ function loadLocal() {
   CAT = (c && Array.isArray(c.list)) ? c : { list: clone(CATALOGO_PADRAO), updatedAt: 0, seedVersion: CAT_SEED_VERSION };
   // Migração só local: NÃO mexe em updatedAt, para nunca passar por cima de preços mais novos da nuvem
   if (migrarCatalogo(CAT)) lsSet(LS.cat, CAT);
-  EMP = Object.assign({}, EMPRESA_PADRAO, lsGet(LS.emp, {}) || {});
+  EMP = normEmp(lsGet(LS.emp, {}));
   _pending = new Set(lsGet(LS.pend, []));
 }
 function saveOrcsLocal() { lsSet(LS.orc, ORCS); }
@@ -629,11 +708,12 @@ function fecharModal(id) { $(id).classList.remove('open'); }
 function totaisDe(o) {
   let mat = 0, srv = 0;
   (o.itens || []).forEach(it => { const v = round2(num(it.qtd) * num(it.preco)); if (it.cat === 'servico') srv += v; else mat += v; });
-  const sub = round2(mat + srv);
+  const desl = calcDesloc(o.desloc).valor;
+  const sub = round2(mat + srv + desl);
   let desc = num(o.desconto);
   if (o.descTipo === 'pct') desc = round2(sub * Math.min(Math.max(desc, 0), 100) / 100);
   desc = Math.min(Math.max(round2(desc), 0), sub);
-  return { mat: round2(mat), srv: round2(srv), sub, desc, total: round2(sub - desc) };
+  return { mat: round2(mat), srv: round2(srv), desl: round2(desl), sub, desc, total: round2(sub - desc) };
 }
 const ST_LABEL = { rascunho: 'Rascunho', enviado: 'Enviado', aprovado: 'Aprovado', recusado: 'Recusado' };
 function renderList() {
@@ -669,6 +749,7 @@ function novoOrcamento() {
     id: uid(), numero: '', data, validade: EMP.validade || 15, status: 'rascunho',
     cliente: { nome: '', tel: '', doc: '', end: '' }, servico: '', itens: [],
     desconto: 0, descTipo: 'valor', pagto: EMP.pagto || '', prazo: '', garantia: EMP.garantia || '', obs: EMP.obs || '',
+    desloc: Object.assign({ km: 0, min: 0, viagens: 1, idaVolta: true }, paramsDesloc()),
     createdAt: Date.now(), updatedAt: 0, _novo: true
   };
   abrirEditor();
@@ -696,6 +777,13 @@ function abrirEditor() {
   $('edPrazo').value = cur.prazo || '';
   $('edGarantia').value = cur.garantia || '';
   $('edObs').value = cur.obs || '';
+  // orçamentos antigos não têm deslocamento: começa zerado (não muda o total)
+  if (!cur.desloc) cur.desloc = Object.assign({ km: 0, min: 0, viagens: 1, idaVolta: true }, paramsDesloc());
+  const d = cur.desloc;
+  $('dsKm').value = d.km ? String(d.km).replace('.', ',') : '';
+  $('dsMin').value = d.min ? String(d.min) : '';
+  $('dsViagens').value = d.viagens || 1;
+  $('dsIdaVolta').checked = d.idaVolta !== false;
   $('btnExcluir').style.display = cur._novo ? 'none' : '';
   renderItens();
   formDirty = false;
@@ -713,6 +801,7 @@ function lerForm() {
   cur.prazo = $('edPrazo').value.trim();
   cur.garantia = $('edGarantia').value.trim();
   cur.obs = $('edObs').value.trim();
+  lerDesloc();
 }
 function validar() {
   if (!cur.cliente.nome) { showToast('Informe o nome do cliente.'); $('edCliNome').focus(); return false; }
@@ -765,11 +854,43 @@ function renderItens() {
 }
 function mudarQtd(i, v) { const q = num(v); if (q <= 0) { showToast('Quantidade deve ser maior que zero.'); renderItens(); return; } cur.itens[i].qtd = q; formDirty = true; renderItens(); }
 function removerItem(i) { cur.itens.splice(i, 1); formDirty = true; renderItens(); }
+function lerDesloc() {
+  if (!cur) return;
+  const d = cur.desloc || (cur.desloc = Object.assign({}, paramsDesloc()));
+  d.km = Math.max(0, num($('dsKm').value)); d.min = Math.max(0, num($('dsMin').value));
+  d.viagens = Math.max(1, parseInt($('dsViagens').value, 10) || 1); d.idaVolta = $('dsIdaVolta').checked;
+}
+function resumoDesloc() {
+  const d = cur.desloc, r = calcDesloc(d), el = $('dsResumo');
+  $('dsOrigem').textContent = 'Saída: ' + (d.origem || (EMP.veiculo && EMP.veiculo.origem) || '—') + ' → ' + (($('edCliEnd').value || '').trim() || 'endereço da obra (preencha em Cliente)');
+  const avisos = [];
+  if (!(num(d.custoKm) > 0)) avisos.push('Custo por km não configurado: preencha em Empresa → Veículo e toque em "Usar custos atuais do veículo".');
+  if (!r.km) { el.innerHTML = 'Informe a distância para calcular.' + (avisos.length ? '<br><span class="ds-aviso">' + avisos.join('<br>') + '</span>' : ''); return; }
+  el.innerHTML = '<b>' + fmtQtd(r.km) + ' km</b> rodados (' + fmtQtd(d.km) + ' km × ' + r.mult + ')<br>'
+    + fmtQtd(r.km) + ' km × ' + brl(d.custoKm) + '/km = ' + brl(r.porKm)
+    + (r.horas && num(d.valorHora) ? '<br>' + fmtQtd(Math.round(r.horas * 100) / 100) + ' h × ' + brl(d.valorHora) + '/h = ' + brl(r.porHora) : '')
+    + (r.minimo ? '<br>Abaixo do mínimo: cobrado o mínimo de ' + brl(d.minimo) : '')
+    + '<br><b>Deslocamento: ' + brl(r.valor) + '</b>'
+    + '<br><span class="muted">Custos do veículo de ' + fmtData(d.em || '') + '</span>'
+    + (avisos.length ? '<br><span class="ds-aviso">' + avisos.join('<br>') + '</span>' : '');
+}
+function atualizarCustosVeiculo() {
+  if (!cur) return;
+  lerDesloc(); Object.assign(cur.desloc, paramsDesloc()); formDirty = true; calcTotais();
+  showToast('Custos do veículo atualizados neste orçamento.');
+}
+function abrirRota() {
+  const o = (EMP.veiculo && EMP.veiculo.origem) || '', dst = ($('edCliEnd').value || '').trim();
+  if (!dst) { showToast('Preencha o endereço da obra em Cliente.'); $('edCliEnd').focus(); return; }
+  // Maps URLs (Google): abre a rota com a distância e o tempo; não precisa de chave de API
+  window.open('https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=' + encodeURIComponent(o) + '&destination=' + encodeURIComponent(dst), '_blank');
+}
 function calcTotais() {
   if (!cur) return;
   cur.desconto = num($('edDesc').value); cur.descTipo = $('edDescTipo').value;
+  lerDesloc(); resumoDesloc();
   const t = totaisDe(cur);
-  $('tMat').textContent = brl(t.mat); $('tSrv').textContent = brl(t.srv); $('tSub').textContent = brl(t.sub);
+  $('tMat').textContent = brl(t.mat); $('tSrv').textContent = brl(t.srv); $('tDesl').textContent = brl(t.desl); $('tSub').textContent = brl(t.sub);
   $('tDesc').textContent = t.desc ? '− ' + brl(t.desc) : brl(0); $('tTot').textContent = brl(t.total);
 }
 function abrirPicker() {
@@ -803,11 +924,13 @@ function htmlGrupos(alvo, list, q, linha) {
   return gruposOrdenados(filtrados).map(g => {
     const arr = filtrados.filter(c => grupoDe(c) === g).sort((a, b) => a.desc.localeCompare(b.desc, 'pt-BR'));
     const aberto = q || _gAbertos[alvo].has(g);
-    return '<details class="grp"' + (aberto ? ' open' : '') + ' data-g="' + esc(g) + '" ontoggle="lembrarGrupo(\'' + alvo + '\',this)">'
+    return '<details class="grp"' + (aberto ? ' open' : '') + ' data-g="' + esc(g) + '" data-alvo="' + alvo + '">'
       + '<summary><span>' + esc(g) + '</span><span class="n">' + arr.length + '</span></summary>'
       + '<div class="body">' + arr.map(linha).join('') + '</div></details>';
   }).join('');
 }
+// ouvinte registrado via JS (não inline): o html2canvas copia a página sem scripts para gerar o PDF
+document.addEventListener('toggle', e => { const el = e.target; if (el && el.matches && el.matches('details.grp[data-alvo]')) lembrarGrupo(el.dataset.alvo, el); }, true);
 function lembrarGrupo(alvo, el) {
   if (($(alvo === 'cat' ? 'buscaCat' : 'pkBusca').value || '').trim()) return;   // busca abre tudo; não grava
   const g = el.dataset.g; if (el.open) _gAbertos[alvo].add(g); else _gAbertos[alvo].delete(g);
@@ -860,15 +983,39 @@ function renderEmpresa() {
   $('empEmail').value = EMP.email || ''; $('empEnd').value = EMP.end || ''; $('empResp').value = EMP.resp || '';
   $('empValidade').value = EMP.validade || ''; $('empGarantia').value = EMP.garantia || '';
   $('empPagto').value = EMP.pagto || ''; $('empObs').value = EMP.obs || '';
+  const v = EMP.veiculo, nz = x => (num(x) ? String(x).replace('.', ',') : '');
+  $('vModelo').value = v.modelo || ''; $('vComb').value = v.comb || 'etanol'; $('vOrigem').value = v.origem || '';
+  $('vPreco').value = nz(v.precoComb); $('vConsumo').value = nz(v.consumo); $('vValor').value = nz(v.valor);
+  $('vDeprec').value = nz(v.deprecAno); $('vKmAno').value = nz(v.kmAno); $('vManut').value = nz(v.manutKm);
+  $('vHora').value = nz(v.valorHora); $('vMinimo').value = nz(v.minimo);
+  resumoVeiculo();
   const p = $('empLogoPrev'); p.src = EMP.logo || 'logo-barragem.png'; p.style.display = '';
   $('contaCard').style.display = (MODE === 'cloud' && currentUser) ? '' : 'none';
   if (currentUser) $('contaEmail').textContent = 'Conectado como ' + (currentUser.email || '');
+}
+function lerVeiculoForm() {
+  const p = x => Math.max(0, num($(x).value));
+  return { modelo: $('vModelo').value.trim(), comb: $('vComb').value, origem: $('vOrigem').value.trim(),
+    precoComb: p('vPreco'), consumo: p('vConsumo'), valor: p('vValor'), deprecAno: p('vDeprec'),
+    kmAno: p('vKmAno'), manutKm: p('vManut'), valorHora: p('vHora'), minimo: p('vMinimo') };
+}
+function resumoVeiculo() {
+  const v = lerVeiculoForm(), c = custoKm(v), el = $('vResumo'), f = n => 'R$ ' + n.toFixed(3).replace('.', ',');
+  const falta = [];
+  if (!(v.precoComb > 0) || !(v.consumo > 0)) falta.push('preço e consumo do combustível');
+  if (!(v.valor > 0) || !(v.kmAno > 0)) falta.push('valor, depreciação e km/ano');
+  el.innerHTML = 'Combustível: ' + f(c.comb) + '/km<br>Depreciação: ' + f(c.dep) + '/km<br>Manutenção: ' + f(c.man) + '/km'
+    + '<br><b>Custo por km: ' + f(c.total) + '</b>'
+    + (v.valorHora ? '<br>Tempo de viagem: ' + brl(v.valorHora) + '/h' : '')
+    + (v.minimo ? '<br>Mínimo por orçamento: ' + brl(v.minimo) : '')
+    + (falta.length ? '<br><span class="ds-aviso">Falta preencher: ' + falta.join('; ') + '.</span>' : '');
 }
 function salvarEmpresa() {
   EMP.nome = $('empNome').value.trim() || 'Barragem'; EMP.cnpj = $('empCnpj').value.trim(); EMP.tel = $('empTel').value.trim();
   EMP.email = $('empEmail').value.trim(); EMP.end = $('empEnd').value.trim(); EMP.resp = $('empResp').value.trim();
   EMP.validade = parseInt($('empValidade').value, 10) || 15; EMP.garantia = $('empGarantia').value.trim();
   EMP.pagto = $('empPagto').value.trim(); EMP.obs = $('empObs').value.trim();
+  EMP.veiculo = lerVeiculoForm();
   persistEmp(); showToast('Dados da empresa salvos ✔');
 }
 /* Logo reduzido para no máx. 400 px (cabe no documento do Firestore, limite 1 MiB). */
@@ -899,6 +1046,7 @@ function relatorioHTML(o) {
   const mat = linhas('material'), srv = linhas('servico');
   const cab = '<tr><th>Descrição</th><th class="c">Qtd.</th><th class="r">Valor unit.</th><th class="r">Total</th></tr>';
   const logo = EMP.logo || LOGO_PADRAO;
+  const dsl = calcDesloc(o.desloc);
   const empLinha = [EMP.cnpj && ('CNPJ ' + esc(EMP.cnpj)), EMP.tel && esc(EMP.tel), EMP.email && esc(EMP.email)].filter(Boolean).join(' · ');
   const cond = [
     o.validade ? '<li><b>Validade da proposta:</b> ' + o.validade + ' dias (até ' + addDias(o.data, o.validade) + ')</li>' : '',
@@ -933,9 +1081,13 @@ function relatorioHTML(o) {
     + '<div class="box"><h4>Serviço</h4><div class="obs">' + esc(o.servico) + '</div></div>'
     + (mat ? '<div class="sec">Materiais</div><table>' + cab + mat + '</table>' : '')
     + (srv ? '<div class="sec">Mão de obra / serviços</div><table>' + cab + srv + '</table>' : '')
+    + (t.desl ? '<div class="sec">Deslocamento</div><table><tr><th>Descrição</th><th class="c">Distância</th><th class="r">Total</th></tr><tr><td>Deslocamento até o local do serviço'
+        + (dsl.mult > 1 ? ' (' + [o.desloc.idaVolta === false ? 'só ida' : 'ida e volta', (o.desloc.viagens > 1 ? o.desloc.viagens + ' viagens' : '')].filter(Boolean).join(', ') + ')' : '')
+        + '</td><td class="c">' + fmtQtd(dsl.km) + ' km</td><td class="r">' + brl(t.desl) + '</td></tr></table>' : '')
     + '<table class="tot">'
     + (mat ? '<tr><td>Materiais</td><td class="r">' + brl(t.mat) + '</td></tr>' : '')
     + (srv ? '<tr><td>Mão de obra / serviços</td><td class="r">' + brl(t.srv) + '</td></tr>' : '')
+    + (t.desl ? '<tr><td>Deslocamento</td><td class="r">' + brl(t.desl) + '</td></tr>' : '')
     + (t.desc ? '<tr><td>Subtotal</td><td class="r">' + brl(t.sub) + '</td></tr><tr><td>Desconto' + (o.descTipo === 'pct' ? ' (' + fmtQtd(o.desconto) + '%)' : '') + '</td><td class="r">− ' + brl(t.desc) + '</td></tr>' : '')
     + '<tr class="f"><td>TOTAL</td><td class="r">' + brl(t.total) + '</td></tr></table>'
     + (cond ? '<div class="box"><h4>Condições</h4><ul>' + cond + '</ul></div>' : '')
@@ -968,6 +1120,7 @@ function textoWhatsApp(o) {
     arr.forEach(it => L.push('• ' + it.desc + ' — ' + fmtQtd(it.qtd) + ' ' + it.un + ' × ' + brl(it.preco) + ' = ' + brl(round2(num(it.qtd) * num(it.preco)))));
   };
   bloco('material', 'Materiais'); bloco('servico', 'Mão de obra / serviços');
+  if (t.desl) { L.push(''); L.push('*Deslocamento*'); L.push('• ' + fmtQtd(calcDesloc(o.desloc).km) + ' km = ' + brl(t.desl)); }
   L.push('');
   if (t.desc) { L.push('Subtotal: ' + brl(t.sub)); L.push('Desconto: − ' + brl(t.desc)); }
   L.push('*TOTAL: ' + brl(t.total) + '*');
@@ -1084,7 +1237,7 @@ function startCloudListeners() {
   }, () => {}));
   cloudUnsub.push(FB.onSnapshot(FB.doc(FB.fs, COL_CFG, 'empresa'), s => {
     const d = s.data();
-    if (d && (d.updatedAt || 0) >= (EMP.updatedAt || 0)) { EMP = Object.assign({}, EMPRESA_PADRAO, d); saveEmpLocal(); if ($('view-emp').classList.contains('active')) renderEmpresa(); }
+    if (d && (d.updatedAt || 0) >= (EMP.updatedAt || 0)) { EMP = normEmp(d); saveEmpLocal(); if ($('view-emp').classList.contains('active')) renderEmpresa(); }
     else if (EMP.updatedAt && !s.metadata.fromCache) FB.setDoc(FB.doc(FB.fs, COL_CFG, 'empresa'), clone(EMP)).catch(() => {});
   }, () => {}));
 }

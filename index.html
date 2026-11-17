@@ -129,6 +129,11 @@ details.grp > .body { padding: 0 12px 4px; }
 .ds-resumo b { color: var(--navy); }
 html[data-dark="1"] .ds-resumo b { color: #fff; }
 .ds-aviso { color: var(--danger); font-weight: 700; }
+.veic-row { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.veic-row:last-child { border-bottom: none; }
+.veic-row .main { flex: 1; min-width: 0; }
+.veic-row .p { font-weight: 800; white-space: nowrap; }
+.tag { display: inline-block; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 10px; background: var(--yellow); color: #3a2a00; margin-left: 4px; vertical-align: middle; }
 .logo-prev { max-height: 60px; max-width: 200px; display: block; margin: 6px 0; }
 </style>
 </head>
@@ -203,7 +208,8 @@ html[data-dark="1"] .ds-resumo b { color: #fff; }
   <div class="card">
     <div class="section-title">Deslocamento</div>
     <p class="muted" id="dsOrigem"></p>
-    <button class="btn btn-ghost btn-block btn-sm" style="margin-top:6px" onclick="abrirRota()">📍 Ver rota e distância no Google Maps</button>
+    <label class="fld">Veículo</label><select id="dsVeic" onchange="trocarVeiculo()"></select>
+    <button class="btn btn-ghost btn-block btn-sm" style="margin-top:8px" onclick="abrirRota()">📍 Ver rota e distância no Google Maps</button>
     <div class="row">
       <div><label class="fld">Distância só de ida (km)</label><input id="dsKm" inputmode="decimal" placeholder="0" oninput="calcTotais()"></div>
       <div><label class="fld">Tempo só de ida (min)</label><input id="dsMin" inputmode="numeric" placeholder="0" oninput="calcTotais()"></div>
@@ -291,31 +297,20 @@ html[data-dark="1"] .ds-resumo b { color: #fff; }
     <button class="btn btn-success btn-block" style="margin-top:12px" onclick="salvarEmpresa()">Salvar dados da empresa</button>
   </div>
   <div class="card">
-    <div class="section-title">Veículo e custo de deslocamento</div>
-    <p class="muted">Usados para calcular o deslocamento de cada orçamento: <b>combustível + depreciação + manutenção</b> por km rodado, mais o tempo de viagem. Confira os valores com os dados reais do veículo.</p>
-    <div class="row">
-      <div><label class="fld">Veículo</label><input id="vModelo"></div>
-      <div><label class="fld">Combustível</label><select id="vComb"><option value="etanol">Etanol</option><option value="gasolina">Gasolina</option></select></div>
-    </div>
+    <div class="section-title">Deslocamento</div>
+    <p class="muted">Valem para todos os veículos. O custo por km de cada veículo fica no card abaixo.</p>
     <label class="fld">Endereço de saída</label><input id="vOrigem" placeholder="Bairro, cidade - UF">
     <div class="row">
-      <div><label class="fld">Preço do combustível (R$/litro)</label><input id="vPreco" inputmode="decimal" placeholder="Preço na bomba" oninput="resumoVeiculo()"></div>
-      <div><label class="fld">Consumo médio (km/l)</label><input id="vConsumo" inputmode="decimal" placeholder="Ex.: 8 a 9 etanol, 10 a 12 gasolina" oninput="resumoVeiculo()"></div>
+      <div><label class="fld">Valor da hora em viagem (R$/h)</label><input id="vHora" inputmode="decimal" placeholder="0 = não cobra o tempo"></div>
+      <div><label class="fld">Deslocamento mínimo (R$)</label><input id="vMinimo" inputmode="decimal" placeholder="0 = sem mínimo"></div>
     </div>
-    <div class="row">
-      <div><label class="fld">Valor do veículo — Tabela FIPE (R$)</label><input id="vValor" inputmode="decimal" placeholder="veiculos.fipe.org.br" oninput="resumoVeiculo()"></div>
-      <div><label class="fld">Depreciação ao ano (%)</label><input id="vDeprec" inputmode="decimal" placeholder="Ex.: 5" oninput="resumoVeiculo()"></div>
-    </div>
-    <div class="row">
-      <div><label class="fld">Km rodados por ano</label><input id="vKmAno" inputmode="numeric" placeholder="Ex.: 20000" oninput="resumoVeiculo()"></div>
-      <div><label class="fld">Manutenção e pneus (R$/km)</label><input id="vManut" inputmode="decimal" placeholder="Ex.: 0,15" oninput="resumoVeiculo()"></div>
-    </div>
-    <div class="row">
-      <div><label class="fld">Valor da hora em viagem (R$/h)</label><input id="vHora" inputmode="decimal" placeholder="0 = não cobra o tempo" oninput="resumoVeiculo()"></div>
-      <div><label class="fld">Deslocamento mínimo (R$)</label><input id="vMinimo" inputmode="decimal" placeholder="0 = sem mínimo" oninput="resumoVeiculo()"></div>
-    </div>
-    <div class="ds-resumo" id="vResumo"></div>
-    <button class="btn btn-success btn-block" style="margin-top:12px" onclick="salvarEmpresa()">Salvar veículo</button>
+    <button class="btn btn-success btn-block" style="margin-top:12px" onclick="salvarEmpresa()">Salvar deslocamento</button>
+  </div>
+  <div class="card">
+    <div class="section-title">Veículos</div>
+    <p class="muted">Cadastre qualquer veículo: carro, picape, moto, van, caminhão… com o combustível dele. Custo por km = <b>combustível + depreciação + manutenção</b>. Toque no veículo para editar.</p>
+    <div id="vLista"></div>
+    <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="editarVeiculo(null)">+ Adicionar veículo</button>
   </div>
   <div class="card" id="contaCard" style="display:none">
     <div class="section-title">Conta</div>
@@ -338,6 +333,37 @@ html[data-dark="1"] .ds-resumo b { color: #fff; }
     <div class="row" style="margin-top:12px">
       <div><button class="btn btn-ghost btn-block" onclick="fecharModal('mPicker')">Cancelar</button></div>
       <div><button class="btn btn-primary btn-block" onclick="confirmarPicker()">Adicionar</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════ MODAL: veículo ═════ -->
+<div class="modal" id="mVeic" onclick="if(event.target===this)fecharModal('mVeic')">
+  <div class="box">
+    <h3 id="mVeicTit">Veículo</h3>
+    <label class="fld">Nome / modelo *</label><input id="vNome" placeholder="Ex.: Fiat Strada 2010">
+    <div class="row">
+      <div><label class="fld">Tipo</label><select id="vTipo"></select></div>
+      <div><label class="fld">Combustível</label><select id="vComb" onchange="unidadesVeiculo();resumoVeiculo()"></select></div>
+    </div>
+    <div class="row">
+      <div><label class="fld" id="lblPreco">Preço do combustível</label><input id="vPreco" inputmode="decimal" placeholder="Preço na bomba" oninput="resumoVeiculo()"></div>
+      <div><label class="fld" id="lblConsumo">Consumo médio</label><input id="vConsumo" inputmode="decimal" placeholder="Média real do veículo" oninput="resumoVeiculo()"></div>
+    </div>
+    <div class="row">
+      <div><label class="fld">Valor do veículo — Tabela FIPE (R$)</label><input id="vValor" inputmode="decimal" placeholder="veiculos.fipe.org.br" oninput="resumoVeiculo()"></div>
+      <div><label class="fld">Depreciação ao ano (%)</label><input id="vDeprec" inputmode="decimal" placeholder="Ex.: 5" oninput="resumoVeiculo()"></div>
+    </div>
+    <div class="row">
+      <div><label class="fld">Km rodados por ano</label><input id="vKmAno" inputmode="numeric" placeholder="Ex.: 20000" oninput="resumoVeiculo()"></div>
+      <div><label class="fld">Manutenção e pneus (R$/km)</label><input id="vManut" inputmode="decimal" placeholder="Ex.: 0,15" oninput="resumoVeiculo()"></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="vPadrao"> Veículo padrão nos novos orçamentos</label>
+    <div class="ds-resumo" id="vResumo"></div>
+    <div class="row" style="margin-top:12px">
+      <div><button class="btn btn-danger btn-block" id="vDel" onclick="excluirVeiculo()">Excluir</button></div>
+      <div><button class="btn btn-ghost btn-block" onclick="fecharModal('mVeic')">Cancelar</button></div>
+      <div><button class="btn btn-success btn-block" onclick="salvarVeiculo()">Salvar</button></div>
     </div>
   </div>
 </div>
@@ -554,11 +580,36 @@ function gruposOrdenados(list) {
   Array.from(set).filter(g => GRUPOS.indexOf(g) < 0).sort((a, b) => a.localeCompare(b, 'pt-BR')).forEach(g => ord.push(g));
   return ord;
 }
-/* Veículo: o que o dono informou (Fiat Strada 2010, saída de Nova Carapina — Serra/ES).
-   Valores numéricos ficam em 0 até a empresa preencher: não há preço inventado. */
-const VEICULO_PADRAO = { modelo: 'Fiat Strada 2010', comb: 'etanol', origem: 'Nova Carapina, Serra - ES',
-  precoComb: 0, consumo: 0, valor: 0, deprecAno: 0, kmAno: 0, manutKm: 0, valorHora: 0, minimo: 0 };
-function normEmp(e) { const r = Object.assign({}, EMPRESA_PADRAO, e || {}); r.veiculo = Object.assign({}, VEICULO_PADRAO, (e && e.veiculo) || {}); return r; }
+/* Veículos: qualquer tipo e combustível. Começa com o que o dono informou (Fiat Strada 2010,
+   saída de Nova Carapina — Serra/ES). Valores numéricos ficam em 0 até a empresa preencher. */
+const COMBUSTIVEIS = {
+  etanol:   { nome: 'Etanol',   unid: 'litro', cons: 'km/l' },
+  gasolina: { nome: 'Gasolina', unid: 'litro', cons: 'km/l' },
+  diesel:   { nome: 'Diesel',   unid: 'litro', cons: 'km/l' },
+  gnv:      { nome: 'GNV',      unid: 'm³',    cons: 'km/m³' },
+  eletrico: { nome: 'Elétrico', unid: 'kWh',   cons: 'km/kWh' }
+};
+const TIPOS_VEICULO = ['Carro', 'Picape / utilitário', 'Moto', 'Van', 'Caminhão', 'Outro'];
+const VEICULO_PADRAO = { id: 'v1', nome: 'Fiat Strada 2010', tipo: 'Picape / utilitário', comb: 'etanol',
+  precoComb: 0, consumo: 0, valor: 0, deprecAno: 0, kmAno: 0, manutKm: 0 };
+const DESLOC_PADRAO = { origem: 'Nova Carapina, Serra - ES', valorHora: 0, minimo: 0 };
+function normEmp(e) {
+  e = e || {};
+  const r = Object.assign({}, EMPRESA_PADRAO, e);
+  r.desloc = Object.assign({}, DESLOC_PADRAO, e.desloc || {});
+  let vs = Array.isArray(e.veiculos) ? e.veiculos : null;
+  if (!vs) {
+    // formato anterior (um único "veiculo"): converte sem perder valores
+    const o = e.veiculo;
+    vs = [Object.assign({}, VEICULO_PADRAO, o ? { nome: o.modelo || VEICULO_PADRAO.nome, comb: o.comb || 'etanol', precoComb: o.precoComb, consumo: o.consumo,
+      valor: o.valor, deprecAno: o.deprecAno, kmAno: o.kmAno, manutKm: o.manutKm } : {})];
+    if (o) { if (o.origem) r.desloc.origem = o.origem; r.desloc.valorHora = num(o.valorHora); r.desloc.minimo = num(o.minimo); }
+  }
+  r.veiculos = vs.map(v => Object.assign({}, VEICULO_PADRAO, v));
+  if (!r.veiculos.some(v => v.id === r.veicPadrao)) r.veicPadrao = r.veiculos.length ? r.veiculos[0].id : '';
+  delete r.veiculo;
+  return r;
+}
 /* Custo por km = combustível (preço ÷ consumo) + depreciação (valor × % ao ano ÷ km por ano) + manutenção */
 function custoKm(v) {
   v = v || {};
@@ -567,8 +618,13 @@ function custoKm(v) {
   const man = num(v.manutKm);
   return { comb, dep, man, total: Math.round((comb + dep + man) * 10000) / 10000 };
 }
+function veicPorId(id) { return EMP.veiculos.find(v => v.id === id) || EMP.veiculos.find(v => v.id === EMP.veicPadrao) || EMP.veiculos[0] || null; }
 /* Parâmetros copiados para o orçamento: mudar o veículo depois não altera orçamentos já feitos */
-function paramsDesloc() { const v = EMP.veiculo || VEICULO_PADRAO; return { custoKm: custoKm(v).total, valorHora: num(v.valorHora), minimo: num(v.minimo), origem: v.origem || '', em: hojeISO() }; }
+function paramsDesloc(veicId) {
+  const v = veicPorId(veicId);
+  return { veicId: v ? v.id : '', veicNome: v ? v.nome : '', custoKm: v ? custoKm(v).total : 0,
+    valorHora: num(EMP.desloc.valorHora), minimo: num(EMP.desloc.minimo), origem: EMP.desloc.origem || '', em: hojeISO() };
+}
 function calcDesloc(d) {
   const z = { km: 0, horas: 0, valor: 0, porKm: 0, porHora: 0, mult: 1, minimo: false };
   if (!d || !(num(d.km) > 0)) return z;
@@ -784,6 +840,7 @@ function abrirEditor() {
   $('dsMin').value = d.min ? String(d.min) : '';
   $('dsViagens').value = d.viagens || 1;
   $('dsIdaVolta').checked = d.idaVolta !== false;
+  preencherSelectVeiculo();
   $('btnExcluir').style.display = cur._novo ? 'none' : '';
   renderItens();
   formDirty = false;
@@ -862,25 +919,37 @@ function lerDesloc() {
 }
 function resumoDesloc() {
   const d = cur.desloc, r = calcDesloc(d), el = $('dsResumo');
-  $('dsOrigem').textContent = 'Saída: ' + (d.origem || (EMP.veiculo && EMP.veiculo.origem) || '—') + ' → ' + (($('edCliEnd').value || '').trim() || 'endereço da obra (preencha em Cliente)');
+  $('dsOrigem').textContent = 'Saída: ' + (d.origem || EMP.desloc.origem || '—') + ' → ' + (($('edCliEnd').value || '').trim() || 'endereço da obra (preencha em Cliente)');
   const avisos = [];
-  if (!(num(d.custoKm) > 0)) avisos.push('Custo por km não configurado: preencha em Empresa → Veículo e toque em "Usar custos atuais do veículo".');
+  if (!(num(d.custoKm) > 0)) avisos.push('Custo por km do veículo não configurado: preencha em Empresa → Veículos e toque em "Usar custos atuais do veículo".');
   if (!r.km) { el.innerHTML = 'Informe a distância para calcular.' + (avisos.length ? '<br><span class="ds-aviso">' + avisos.join('<br>') + '</span>' : ''); return; }
   el.innerHTML = '<b>' + fmtQtd(r.km) + ' km</b> rodados (' + fmtQtd(d.km) + ' km × ' + r.mult + ')<br>'
     + fmtQtd(r.km) + ' km × ' + brl(d.custoKm) + '/km = ' + brl(r.porKm)
     + (r.horas && num(d.valorHora) ? '<br>' + fmtQtd(Math.round(r.horas * 100) / 100) + ' h × ' + brl(d.valorHora) + '/h = ' + brl(r.porHora) : '')
     + (r.minimo ? '<br>Abaixo do mínimo: cobrado o mínimo de ' + brl(d.minimo) : '')
     + '<br><b>Deslocamento: ' + brl(r.valor) + '</b>'
-    + '<br><span class="muted">Custos do veículo de ' + fmtData(d.em || '') + '</span>'
+    + '<br><span class="muted">' + esc(d.veicNome || 'Veículo') + ' · custos de ' + fmtData(d.em || '') + '</span>'
     + (avisos.length ? '<br><span class="ds-aviso">' + avisos.join('<br>') + '</span>' : '');
+}
+function preencherSelectVeiculo() {
+  const d = cur.desloc, sel = $('dsVeic');
+  let ops = EMP.veiculos.map(v => '<option value="' + esc(v.id) + '">' + esc(v.nome) + ' · ' + brl(custoKm(v).total) + '/km</option>');
+  // veículo excluído depois do orçamento: mantém o nome gravado
+  if (d.veicId && !EMP.veiculos.some(v => v.id === d.veicId)) ops.unshift('<option value="' + esc(d.veicId) + '">' + esc(d.veicNome || 'Veículo removido') + ' (removido)</option>');
+  if (!ops.length) ops = ['<option value="">Nenhum veículo cadastrado</option>'];
+  sel.innerHTML = ops.join(''); sel.value = d.veicId || '';
+}
+function trocarVeiculo() {
+  if (!cur) return;
+  lerDesloc(); Object.assign(cur.desloc, paramsDesloc($('dsVeic').value)); formDirty = true; calcTotais();
 }
 function atualizarCustosVeiculo() {
   if (!cur) return;
-  lerDesloc(); Object.assign(cur.desloc, paramsDesloc()); formDirty = true; calcTotais();
+  lerDesloc(); Object.assign(cur.desloc, paramsDesloc(cur.desloc.veicId)); formDirty = true; preencherSelectVeiculo(); calcTotais();
   showToast('Custos do veículo atualizados neste orçamento.');
 }
 function abrirRota() {
-  const o = (EMP.veiculo && EMP.veiculo.origem) || '', dst = ($('edCliEnd').value || '').trim();
+  const o = (cur && cur.desloc && cur.desloc.origem) || EMP.desloc.origem || '', dst = ($('edCliEnd').value || '').trim();
   if (!dst) { showToast('Preencha o endereço da obra em Cliente.'); $('edCliEnd').focus(); return; }
   // Maps URLs (Google): abre a rota com a distância e o tempo; não precisa de chave de API
   window.open('https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=' + encodeURIComponent(o) + '&destination=' + encodeURIComponent(dst), '_blank');
@@ -983,39 +1052,80 @@ function renderEmpresa() {
   $('empEmail').value = EMP.email || ''; $('empEnd').value = EMP.end || ''; $('empResp').value = EMP.resp || '';
   $('empValidade').value = EMP.validade || ''; $('empGarantia').value = EMP.garantia || '';
   $('empPagto').value = EMP.pagto || ''; $('empObs').value = EMP.obs || '';
-  const v = EMP.veiculo, nz = x => (num(x) ? String(x).replace('.', ',') : '');
-  $('vModelo').value = v.modelo || ''; $('vComb').value = v.comb || 'etanol'; $('vOrigem').value = v.origem || '';
-  $('vPreco').value = nz(v.precoComb); $('vConsumo').value = nz(v.consumo); $('vValor').value = nz(v.valor);
-  $('vDeprec').value = nz(v.deprecAno); $('vKmAno').value = nz(v.kmAno); $('vManut').value = nz(v.manutKm);
-  $('vHora').value = nz(v.valorHora); $('vMinimo').value = nz(v.minimo);
-  resumoVeiculo();
+  const nz = x => (num(x) ? String(x).replace('.', ',') : '');
+  $('vOrigem').value = EMP.desloc.origem || ''; $('vHora').value = nz(EMP.desloc.valorHora); $('vMinimo').value = nz(EMP.desloc.minimo);
+  renderVeiculos();
   const p = $('empLogoPrev'); p.src = EMP.logo || 'logo-barragem.png'; p.style.display = '';
   $('contaCard').style.display = (MODE === 'cloud' && currentUser) ? '' : 'none';
   if (currentUser) $('contaEmail').textContent = 'Conectado como ' + (currentUser.email || '');
 }
+let veicEditId = null;
+function renderVeiculos() {
+  const el = $('vLista');
+  el.innerHTML = EMP.veiculos.length ? EMP.veiculos.map(v => {
+    const c = custoKm(v), cb = COMBUSTIVEIS[v.comb] || COMBUSTIVEIS.etanol;
+    return '<div class="veic-row" onclick="editarVeiculo(\'' + esc(v.id) + '\')"><div class="main"><b>' + esc(v.nome) + '</b>'
+      + (v.id === EMP.veicPadrao ? '<span class="tag">PADRÃO</span>' : '')
+      + '<div class="muted">' + esc(v.tipo) + ' · ' + cb.nome + '</div></div>'
+      + '<div class="p' + (c.total ? '' : ' zero') + '"' + (c.total ? '' : ' style="color:var(--danger)"') + '>' + brl(c.total) + '/km</div></div>';
+  }).join('') : '<p class="muted">Nenhum veículo cadastrado.</p>';
+}
+function editarVeiculo(id) {
+  veicEditId = id;
+  const v = id ? EMP.veiculos.find(x => x.id === id) : Object.assign({}, VEICULO_PADRAO, { id: '', nome: '', tipo: 'Carro', comb: 'gasolina' });
+  if (!v) return;
+  const nz = x => (num(x) ? String(x).replace('.', ',') : '');
+  $('mVeicTit').textContent = id ? 'Editar veículo' : 'Novo veículo';
+  $('vTipo').innerHTML = TIPOS_VEICULO.map(t => '<option>' + esc(t) + '</option>').join('');
+  $('vComb').innerHTML = Object.keys(COMBUSTIVEIS).map(k => '<option value="' + k + '">' + COMBUSTIVEIS[k].nome + '</option>').join('');
+  $('vNome').value = v.nome || ''; $('vTipo').value = TIPOS_VEICULO.indexOf(v.tipo) >= 0 ? v.tipo : 'Outro'; $('vComb').value = COMBUSTIVEIS[v.comb] ? v.comb : 'gasolina';
+  $('vPreco').value = nz(v.precoComb); $('vConsumo').value = nz(v.consumo); $('vValor').value = nz(v.valor);
+  $('vDeprec').value = nz(v.deprecAno); $('vKmAno').value = nz(v.kmAno); $('vManut').value = nz(v.manutKm);
+  $('vPadrao').checked = id ? id === EMP.veicPadrao : !EMP.veiculos.length;
+  $('vDel').style.display = id ? '' : 'none';
+  unidadesVeiculo(); resumoVeiculo();
+  $('mVeic').classList.add('open');
+}
+function unidadesVeiculo() {
+  const cb = COMBUSTIVEIS[$('vComb').value] || COMBUSTIVEIS.gasolina;
+  $('lblPreco').textContent = 'Preço (R$/' + cb.unid + ')';
+  $('lblConsumo').textContent = 'Consumo médio (' + cb.cons + ')';
+}
 function lerVeiculoForm() {
   const p = x => Math.max(0, num($(x).value));
-  return { modelo: $('vModelo').value.trim(), comb: $('vComb').value, origem: $('vOrigem').value.trim(),
-    precoComb: p('vPreco'), consumo: p('vConsumo'), valor: p('vValor'), deprecAno: p('vDeprec'),
-    kmAno: p('vKmAno'), manutKm: p('vManut'), valorHora: p('vHora'), minimo: p('vMinimo') };
+  return { id: veicEditId || uid(), nome: $('vNome').value.trim(), tipo: $('vTipo').value, comb: $('vComb').value,
+    precoComb: p('vPreco'), consumo: p('vConsumo'), valor: p('vValor'), deprecAno: p('vDeprec'), kmAno: p('vKmAno'), manutKm: p('vManut') };
 }
 function resumoVeiculo() {
   const v = lerVeiculoForm(), c = custoKm(v), el = $('vResumo'), f = n => 'R$ ' + n.toFixed(3).replace('.', ',');
   const falta = [];
-  if (!(v.precoComb > 0) || !(v.consumo > 0)) falta.push('preço e consumo do combustível');
+  if (!(v.precoComb > 0) || !(v.consumo > 0)) falta.push('preço e consumo');
   if (!(v.valor > 0) || !(v.kmAno > 0)) falta.push('valor, depreciação e km/ano');
   el.innerHTML = 'Combustível: ' + f(c.comb) + '/km<br>Depreciação: ' + f(c.dep) + '/km<br>Manutenção: ' + f(c.man) + '/km'
     + '<br><b>Custo por km: ' + f(c.total) + '</b>'
-    + (v.valorHora ? '<br>Tempo de viagem: ' + brl(v.valorHora) + '/h' : '')
-    + (v.minimo ? '<br>Mínimo por orçamento: ' + brl(v.minimo) : '')
     + (falta.length ? '<br><span class="ds-aviso">Falta preencher: ' + falta.join('; ') + '.</span>' : '');
+}
+function salvarVeiculo() {
+  const v = lerVeiculoForm();
+  if (!v.nome) { showToast('Informe o nome do veículo.'); $('vNome').focus(); return; }
+  const i = EMP.veiculos.findIndex(x => x.id === v.id);
+  if (i >= 0) EMP.veiculos[i] = v; else EMP.veiculos.push(v);
+  if ($('vPadrao').checked || EMP.veiculos.length === 1) EMP.veicPadrao = v.id;
+  persistEmp(); fecharModal('mVeic'); renderVeiculos(); showToast('Veículo salvo ✔');
+}
+function excluirVeiculo() {
+  if (!veicEditId) return;
+  if (!confirm('Excluir este veículo? Orçamentos já feitos não são alterados.')) return;
+  EMP.veiculos = EMP.veiculos.filter(x => x.id !== veicEditId);
+  if (EMP.veicPadrao === veicEditId) EMP.veicPadrao = EMP.veiculos.length ? EMP.veiculos[0].id : '';
+  persistEmp(); fecharModal('mVeic'); renderVeiculos();
 }
 function salvarEmpresa() {
   EMP.nome = $('empNome').value.trim() || 'Barragem'; EMP.cnpj = $('empCnpj').value.trim(); EMP.tel = $('empTel').value.trim();
   EMP.email = $('empEmail').value.trim(); EMP.end = $('empEnd').value.trim(); EMP.resp = $('empResp').value.trim();
   EMP.validade = parseInt($('empValidade').value, 10) || 15; EMP.garantia = $('empGarantia').value.trim();
   EMP.pagto = $('empPagto').value.trim(); EMP.obs = $('empObs').value.trim();
-  EMP.veiculo = lerVeiculoForm();
+  EMP.desloc = { origem: $('vOrigem').value.trim(), valorHora: Math.max(0, num($('vHora').value)), minimo: Math.max(0, num($('vMinimo').value)) };
   persistEmp(); showToast('Dados da empresa salvos ✔');
 }
 /* Logo reduzido para no máx. 400 px (cabe no documento do Firestore, limite 1 MiB). */

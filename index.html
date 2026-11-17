@@ -24,7 +24,7 @@ html[data-dark="1"] {
   --border: #1e2a3f; --navy: #0b2a5e;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html { max-width: 100vw; }
+html, body { max-width: 100%; overflow-x: hidden; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding-bottom: 90px; overflow-x: hidden; }
 .hdr { position: sticky; top: 0; z-index: 90; }
 .topbar { background: #fff; color: var(--navy); padding: 8px 14px; padding-top: max(8px, env(safe-area-inset-top)); display: flex; align-items: center; gap: 10px; }
@@ -41,11 +41,16 @@ html[data-dark="1"] .tabs button.on { color: #fff; }
 .card { background: var(--card); border-radius: var(--radius); padding: 16px; margin: 10px 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; padding: 6px 10px; background: var(--navy); color: #fff; border-radius: 6px; border-left: 5px solid var(--yellow); }
 .fld { display: block; font-size: 11px; font-weight: 600; color: var(--text-light); margin: 8px 0 3px; text-transform: uppercase; letter-spacing: .3px; }
-input, select, textarea { width: 100%; max-width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; background: var(--bg); color: var(--text); font-family: inherit; }
+input, select, textarea { width: 100%; max-width: 100%; min-width: 0; display: block; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; background: var(--bg); color: var(--text); font-family: inherit; }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(32,118,193,.18); }
 textarea { resize: vertical; min-height: 60px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
-.row > div { flex: 1 1 calc(50% - 4px); min-width: 130px; }
+.row > div { flex: 1 1 calc(50% - 4px); min-width: 130px; max-width: 100%; }
+/* iOS: o campo de data tem largura própria e ignorava width:100%, passando da coluna */
+input[type="date"] { -webkit-appearance: none; appearance: none; min-height: 42px; text-align: left; }
+input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+.card { max-width: calc(100% - 24px); }
+#syncCard span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
 .btn-primary { background: var(--blue); color: #fff; }
 .btn-navy { background: var(--navy); color: #fff; }
@@ -91,6 +96,13 @@ html[data-dark="1"] .banner { background: #2a2210; color: #f5d38a; border-color:
 .actions .btn { flex: 1 1 calc(33% - 8px); min-width: 100px; padding: 11px 8px; }
 
 /* catálogo */
+details.grp { border: 1px solid var(--border); border-radius: 10px; margin-top: 8px; overflow: hidden; }
+details.grp > summary { list-style: none; cursor: pointer; padding: 10px 12px; font-weight: 800; font-size: 13px; color: #fff; background: var(--navy); display: flex; justify-content: space-between; gap: 8px; }
+details.grp > summary::-webkit-details-marker { display: none; }
+details.grp > summary::after { content: '▸'; margin-left: 6px; }
+details.grp[open] > summary::after { content: '▾'; }
+details.grp > summary .n { font-weight: 600; opacity: .8; margin-left: auto; }
+details.grp > .body { padding: 0 12px 4px; }
 .cat-row { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
 .cat-row:last-child { border-bottom: none; }
 .cat-row .main { flex: 1; min-width: 0; }
@@ -217,7 +229,7 @@ html[data-dark="1"] .banner { background: #2a2210; color: #f5d38a; border-color:
 <div id="view-cat" class="view">
   <div class="card">
     <div class="section-title">Catálogo de itens</div>
-    <p class="muted" style="margin-bottom:8px">Cadastre materiais e serviços com o preço de venda. No orçamento, basta escolher o item e informar a quantidade. Itens com preço R$ 0,00 aparecem em vermelho.</p>
+    <p class="muted" style="margin-bottom:8px">Itens separados por grupo. Toque no grupo para abrir e no item para editar o preço, o nome ou o grupo. Itens com preço R$ 0,00 aparecem em vermelho. Use o <b>+</b> para incluir um item novo.</p>
     <input id="buscaCat" placeholder="Buscar item" oninput="renderCatalogo()">
     <div id="catLista" style="margin-top:6px"></div>
   </div>
@@ -266,7 +278,7 @@ html[data-dark="1"] .banner { background: #2a2210; color: #f5d38a; border-color:
   <div class="box">
     <h3>Adicionar item</h3>
     <input id="pkBusca" placeholder="Buscar no catálogo" oninput="renderPicker()">
-    <div id="pkLista" style="max-height:38vh;overflow:auto"></div>
+    <div id="pkLista" style="max-height:46vh;overflow:auto"></div>
     <label class="fld">Quantidade</label>
     <input id="pkQtd" inputmode="decimal" value="1">
     <div class="row" style="margin-top:12px">
@@ -281,10 +293,11 @@ html[data-dark="1"] .banner { background: #2a2210; color: #f5d38a; border-color:
   <div class="box">
     <h3 id="mCatTit">Item do catálogo</h3>
     <label class="fld">Descrição *</label><input id="ciDesc" placeholder='Ex.: Tubulação de cobre 1/4" + 3/8" (par)'>
+    <label class="fld">Grupo</label><input id="ciGrupo" list="dlGrupos" placeholder="Escolha ou digite um grupo novo"><datalist id="dlGrupos"></datalist>
     <div class="row">
       <div><label class="fld">Tipo</label><select id="ciCat"><option value="material">Material</option><option value="servico">Mão de obra / serviço</option></select></div>
       <div><label class="fld">Unidade</label><select id="ciUn">
-        <option value="m">m (metro)</option><option value="un">un (unidade)</option><option value="pç">pç (peça)</option><option value="par">par</option><option value="cx">cx (caixa)</option><option value="rolo">rolo</option><option value="kg">kg</option><option value="h">h (hora)</option><option value="serv.">serviço</option><option value="vb">vb (verba)</option>
+        <option value="m">m (metro)</option><option value="un">un (unidade)</option><option value="pç">pç (peça)</option><option value="par">par</option><option value="cx">cx (caixa)</option><option value="rolo">rolo</option><option value="kg">kg</option><option value="h">h (hora)</option><option value="serv.">serviço</option><option value="pt">pt (ponto)</option><option value="kit">kit</option><option value="vb">vb (verba)</option>
       </select></div>
     </div>
     <label class="fld">Preço de venda por unidade (R$) *</label><input id="ciPreco" inputmode="decimal" placeholder="0,00">
@@ -350,13 +363,143 @@ const LS = {
   dark: 'barragem_dark'
 };
 
-/* Itens de exemplo, SEM preço: o preço de venda é da empresa e deve ser cadastrado no catálogo. */
-const CATALOGO_PADRAO = [
-  { id: 'c1', desc: 'Tubulação de cobre 1/4" + 3/8" (par)', cat: 'material', un: 'm', preco: 0 },
-  { id: 'c2', desc: 'Suporte para condensadora 12.000 BTUs', cat: 'material', un: 'un', preco: 0 },
-  { id: 'c3', desc: 'Disjuntor bifásico 20 A', cat: 'material', un: 'un', preco: 0 },
-  { id: 'c4', desc: 'Mão de obra — instalação de ar-condicionado split', cat: 'servico', un: 'serv.', preco: 0 }
+/* Catálogo padrão por grupos — SEM preço: o preço de venda é da empresa e deve
+   ser preenchido no app. IDs fixos: NUNCA reutilizar nem renumerar (a migração
+   usa o id para saber o que já existe; itens excluídos pelo usuário não voltam). */
+const CAT_SEED_VERSION = 2;
+const GRUPOS = [
+  'Ar-condicionado — instalação',
+  'Ar-condicionado — manutenção',
+  'Ar-condicionado — materiais',
+  'Elétrica — instalação',
+  'Elétrica — manutenção',
+  'Elétrica — materiais',
+  'Deslocamento e outros'
 ];
+const G = { ACI: GRUPOS[0], ACM: GRUPOS[1], ACMAT: GRUPOS[2], ELI: GRUPOS[3], ELM: GRUPOS[4], ELMAT: GRUPOS[5], OUT: GRUPOS[6] };
+const S = 'servico', M = 'material';
+const CATALOGO_PADRAO = [
+  // Ar-condicionado — instalação
+  ['c4',  G.ACI, S, 'serv.', 'Mão de obra — instalação de ar-condicionado split'],
+  ['a101', G.ACI, S, 'serv.', 'Instalação de split 9.000 a 12.000 BTUs'],
+  ['a102', G.ACI, S, 'serv.', 'Instalação de split 18.000 BTUs'],
+  ['a103', G.ACI, S, 'serv.', 'Instalação de split 22.000 a 24.000 BTUs'],
+  ['a104', G.ACI, S, 'serv.', 'Instalação de split 30.000 a 36.000 BTUs'],
+  ['a105', G.ACI, S, 'serv.', 'Instalação de split piso-teto / cassete'],
+  ['a106', G.ACI, S, 'serv.', 'Instalação de ar-condicionado de janela'],
+  ['a107', G.ACI, S, 'serv.', 'Desinstalação de split (com recolhimento do gás)'],
+  ['a108', G.ACI, S, 'serv.', 'Remanejamento / reinstalação de split'],
+  ['a109', G.ACI, S, 'm',     'Infraestrutura adicional (tubulação, cabo e dreno) por metro'],
+  ['a110', G.ACI, S, 'm',     'Rasgo e embutimento de tubulação em alvenaria'],
+  ['a111', G.ACI, S, 'serv.', 'Instalação de bomba de dreno'],
+  ['a112', G.ACI, S, 'serv.', 'Instalação de circuito dedicado para ar-condicionado'],
+  // Ar-condicionado — manutenção
+  ['a201', G.ACM, S, 'serv.', 'Visita técnica / diagnóstico — ar-condicionado'],
+  ['a202', G.ACM, S, 'serv.', 'Limpeza e higienização de split até 12.000 BTUs'],
+  ['a203', G.ACM, S, 'serv.', 'Limpeza e higienização de split 18.000 a 24.000 BTUs'],
+  ['a204', G.ACM, S, 'serv.', 'Limpeza completa (evaporadora + condensadora)'],
+  ['a205', G.ACM, S, 'serv.', 'Manutenção preventiva (PMOC) — por equipamento'],
+  ['a206', G.ACM, S, 'serv.', 'Localização de vazamento e teste com nitrogênio'],
+  ['a207', G.ACM, S, 'serv.', 'Vácuo e recarga de gás (mão de obra)'],
+  ['a208', G.ACM, S, 'un',    'Solda de tubulação (ponto)'],
+  ['a209', G.ACM, S, 'serv.', 'Troca de capacitor (mão de obra)'],
+  ['a210', G.ACM, S, 'serv.', 'Troca de placa eletrônica (mão de obra)'],
+  ['a211', G.ACM, S, 'serv.', 'Troca de motor ventilador (mão de obra)'],
+  ['a212', G.ACM, S, 'serv.', 'Troca de compressor (mão de obra)'],
+  // Ar-condicionado — materiais
+  ['c1',  G.ACMAT, M, 'm',    'Tubulação de cobre 1/4" + 3/8" (par)'],
+  ['a301', G.ACMAT, M, 'm',   'Tubulação de cobre 1/4" + 1/2" (par)'],
+  ['a302', G.ACMAT, M, 'm',   'Tubulação de cobre 3/8" + 5/8" (par)'],
+  ['a303', G.ACMAT, M, 'm',   'Isolamento térmico para tubulação'],
+  ['c2',  G.ACMAT, M, 'un',   'Suporte para condensadora 12.000 BTUs'],
+  ['a304', G.ACMAT, M, 'un',  'Suporte para condensadora 18.000 a 24.000 BTUs'],
+  ['a305', G.ACMAT, M, 'un',  'Suporte para condensadora 30.000 BTUs ou maior'],
+  ['a306', G.ACMAT, M, 'm',   'Mangueira de dreno'],
+  ['a307', G.ACMAT, M, 'm',   'Cabo PP 4 x 1,5 mm² (interligação)'],
+  ['a308', G.ACMAT, M, 'm',   'Canaleta de acabamento para tubulação'],
+  ['a309', G.ACMAT, M, 'rolo','Fita PVC para acabamento'],
+  ['a310', G.ACMAT, M, 'kg',  'Gás refrigerante R-410A'],
+  ['a311', G.ACMAT, M, 'kg',  'Gás refrigerante R-32'],
+  ['a312', G.ACMAT, M, 'kg',  'Gás refrigerante R-22'],
+  ['a313', G.ACMAT, M, 'un',  'Capacitor'],
+  ['a314', G.ACMAT, M, 'un',  'Bomba de dreno'],
+  ['a315', G.ACMAT, M, 'kit', 'Buchas, parafusos e chumbadores'],
+  // Elétrica — instalação
+  ['e101', G.ELI, S, 'pt',    'Instalação de ponto de tomada ou interruptor (com fiação)'],
+  ['e102', G.ELI, S, 'pt',    'Instalação de ponto de iluminação'],
+  ['e103', G.ELI, S, 'un',    'Instalação de luminária / lustre / plafon'],
+  ['e104', G.ELI, S, 'un',    'Instalação de chuveiro elétrico'],
+  ['e105', G.ELI, S, 'un',    'Instalação de ventilador de teto'],
+  ['e106', G.ELI, S, 'un',    'Instalação de sensor de presença / fotocélula'],
+  ['e107', G.ELI, S, 'un',    'Instalação de motor de portão'],
+  ['e108', G.ELI, S, 'un',    'Instalação de disjuntor'],
+  ['e109', G.ELI, S, 'un',    'Instalação de DR / DPS'],
+  ['e110', G.ELI, S, 'serv.', 'Montagem de quadro de distribuição'],
+  ['e111', G.ELI, S, 'serv.', 'Instalação de circuito dedicado (chuveiro, forno, etc.)'],
+  ['e112', G.ELI, S, 'm',     'Passagem de fiação'],
+  ['e113', G.ELI, S, 'm',     'Instalação de eletroduto / conduíte'],
+  ['e114', G.ELI, S, 'serv.', 'Sistema de aterramento (haste e conexões)'],
+  ['e115', G.ELI, S, 'serv.', 'Montagem de padrão de entrada de energia'],
+  // Elétrica — manutenção
+  ['e201', G.ELM, S, 'serv.', 'Visita técnica / diagnóstico — elétrica'],
+  ['e202', G.ELM, S, 'h',     'Hora técnica'],
+  ['e203', G.ELM, S, 'un',    'Troca de tomada ou interruptor'],
+  ['e204', G.ELM, S, 'un',    'Troca de disjuntor'],
+  ['e205', G.ELM, S, 'un',    'Troca de resistência de chuveiro'],
+  ['e206', G.ELM, S, 'serv.', 'Localização e reparo de curto-circuito / falha'],
+  ['e207', G.ELM, S, 'serv.', 'Revisão e organização de quadro de distribuição'],
+  // Elétrica — materiais
+  ['e301', G.ELMAT, M, 'un',   'Disjuntor monopolar 16 A'],
+  ['e302', G.ELMAT, M, 'un',   'Disjuntor monopolar 20 A'],
+  ['e303', G.ELMAT, M, 'un',   'Disjuntor monopolar 25 A'],
+  ['c3',  G.ELMAT, M, 'un',    'Disjuntor bifásico 20 A'],
+  ['e304', G.ELMAT, M, 'un',   'Disjuntor bifásico 25 A'],
+  ['e305', G.ELMAT, M, 'un',   'Disjuntor bifásico 32 A'],
+  ['e306', G.ELMAT, M, 'un',   'Disjuntor bifásico 40 A'],
+  ['e307', G.ELMAT, M, 'un',   'Interruptor DR bipolar 30 mA'],
+  ['e308', G.ELMAT, M, 'un',   'DPS (protetor contra surtos)'],
+  ['e309', G.ELMAT, M, 'm',    'Cabo flexível 1,5 mm²'],
+  ['e310', G.ELMAT, M, 'm',    'Cabo flexível 2,5 mm²'],
+  ['e311', G.ELMAT, M, 'm',    'Cabo flexível 4 mm²'],
+  ['e312', G.ELMAT, M, 'm',    'Cabo flexível 6 mm²'],
+  ['e313', G.ELMAT, M, 'm',    'Cabo flexível 10 mm²'],
+  ['e314', G.ELMAT, M, 'm',    'Eletroduto corrugado 3/4"'],
+  ['e315', G.ELMAT, M, 'un',   'Tomada 10 A'],
+  ['e316', G.ELMAT, M, 'un',   'Tomada 20 A'],
+  ['e317', G.ELMAT, M, 'un',   'Interruptor simples'],
+  ['e318', G.ELMAT, M, 'un',   'Caixa de embutir 4x2'],
+  ['e319', G.ELMAT, M, 'un',   'Quadro de distribuição'],
+  ['e320', G.ELMAT, M, 'un',   'Haste de aterramento'],
+  ['e321', G.ELMAT, M, 'un',   'Conector de emenda'],
+  ['e322', G.ELMAT, M, 'rolo', 'Fita isolante'],
+  // Deslocamento e outros
+  ['o101', G.OUT, S, 'vb',    'Taxa de deslocamento'],
+  ['o102', G.OUT, S, 'vb',    'Andaime ou escada especial'],
+  ['o103', G.OUT, M, 'vb',    'Material de consumo (fixações, terminais, etc.)']
+].map(([id, grupo, cat, un, desc]) => ({ id, grupo, cat, un, desc, preco: 0 }));
+const GRUPO_LEGADO = { c1: G.ACMAT, c2: G.ACMAT, c3: G.ELMAT, c4: G.ACI };
+function grupoDe(c) { return c.grupo || GRUPO_LEGADO[c.id] || (c.cat === 'servico' ? 'Outros serviços' : 'Outros materiais'); }
+/* Acrescenta ao catálogo os itens padrão que ainda não existem e dá grupo aos antigos.
+   Nunca altera preço, descrição ou unidade de itens existentes; não devolve itens que
+   o usuário excluiu (lista "removidos"). Retorna true se mudou algo. */
+function migrarCatalogo(c) {
+  let mudou = false;
+  if (!Array.isArray(c.list)) { c.list = []; mudou = true; }
+  if ((c.seedVersion || 1) < CAT_SEED_VERSION) {
+    const ids = new Set(c.list.map(i => i.id));
+    const removidos = new Set(c.removidos || []);
+    CATALOGO_PADRAO.forEach(i => { if (!ids.has(i.id) && !removidos.has(i.id)) c.list.push(clone(i)); });
+    c.seedVersion = CAT_SEED_VERSION; mudou = true;
+  }
+  c.list.forEach(i => { if (!i.grupo) { i.grupo = grupoDe(i); mudou = true; } });
+  return mudou;
+}
+function gruposOrdenados(list) {
+  const set = new Set(list.map(grupoDe));
+  const ord = GRUPOS.filter(g => set.has(g));
+  Array.from(set).filter(g => GRUPOS.indexOf(g) < 0).sort((a, b) => a.localeCompare(b, 'pt-BR')).forEach(g => ord.push(g));
+  return ord;
+}
 const EMPRESA_PADRAO = { nome: 'Barragem', cnpj: '', tel: '', email: '', end: '', resp: '', logo: '', validade: 15, garantia: '', pagto: '', obs: '', updatedAt: 0 };
 
 let ORCS = [];
@@ -401,7 +544,9 @@ function loadLocal() {
   const o = lsGet(LS.orc, []);
   ORCS = Array.isArray(o) ? o : [];
   const c = lsGet(LS.cat, null);
-  CAT = (c && Array.isArray(c.list)) ? c : { list: clone(CATALOGO_PADRAO), updatedAt: 0 };
+  CAT = (c && Array.isArray(c.list)) ? c : { list: clone(CATALOGO_PADRAO), updatedAt: 0, seedVersion: CAT_SEED_VERSION };
+  // Migração só local: NÃO mexe em updatedAt, para nunca passar por cima de preços mais novos da nuvem
+  if (migrarCatalogo(CAT)) lsSet(LS.cat, CAT);
   EMP = Object.assign({}, EMPRESA_PADRAO, lsGet(LS.emp, {}) || {});
   _pending = new Set(lsGet(LS.pend, []));
 }
@@ -632,12 +777,11 @@ function abrirPicker() {
   renderPicker(); $('mPicker').classList.add('open');
 }
 function renderPicker() {
-  const q = ($('pkBusca').value || '').toLowerCase();
-  const arr = CAT.list.filter(c => !q || c.desc.toLowerCase().indexOf(q) >= 0);
-  $('pkLista').innerHTML = arr.length ? arr.map(c => '<div class="pick' + (pickSel === c.id ? ' sel' : '') + '" onclick="pickSel=\'' + esc(c.id) + '\';renderPicker()">'
+  const q = ($('pkBusca').value || '').toLowerCase().trim();
+  const html = htmlGrupos('pk', CAT.list, q, c => '<div class="pick' + (pickSel === c.id ? ' sel' : '') + '" onclick="pickSel=\'' + esc(c.id) + '\';renderPicker()">'
     + '<span>' + esc(c.desc) + '<br><span class="muted">' + (c.cat === 'servico' ? 'Serviço' : 'Material') + ' · ' + esc(c.un) + '</span></span>'
-    + '<b' + (c.preco ? '' : ' style="color:var(--danger)"') + '>' + brl(c.preco) + '</b></div>').join('')
-    : '<p class="muted" style="margin-top:8px">Nenhum item. Cadastre na aba Catálogo.</p>';
+    + '<b' + (c.preco ? '' : ' style="color:var(--danger)"') + '>' + brl(c.preco) + '</b></div>');
+  $('pkLista').innerHTML = html || '<p class="muted" style="margin-top:8px">Nenhum item. Cadastre na aba Catálogo.</p>';
 }
 function confirmarPicker() {
   const c = CAT.list.find(x => x.id === pickSel);
@@ -648,30 +792,43 @@ function confirmarPicker() {
   // O preço é copiado para o orçamento: mudanças futuras no catálogo não alteram orçamentos já feitos.
   const ex = cur.itens.find(it => it.catId === c.id && num(it.preco) === num(c.preco));
   if (ex) ex.qtd = round2(num(ex.qtd) + q);
-  else cur.itens.push({ catId: c.id, desc: c.desc, cat: c.cat, un: c.un, preco: num(c.preco), qtd: q });
+  else cur.itens.push({ catId: c.id, desc: c.desc, cat: c.cat, un: c.un, preco: num(c.preco), qtd: q, grupo: grupoDe(c) });
   formDirty = true; fecharModal('mPicker'); renderItens();
 }
 
 /* ══════════════ catálogo ══════════════ */
+const _gAbertos = { cat: new Set(), pk: new Set() };
+function htmlGrupos(alvo, list, q, linha) {
+  const filtrados = list.filter(c => !q || (c.desc + ' ' + grupoDe(c)).toLowerCase().indexOf(q) >= 0);
+  return gruposOrdenados(filtrados).map(g => {
+    const arr = filtrados.filter(c => grupoDe(c) === g).sort((a, b) => a.desc.localeCompare(b.desc, 'pt-BR'));
+    const aberto = q || _gAbertos[alvo].has(g);
+    return '<details class="grp"' + (aberto ? ' open' : '') + ' data-g="' + esc(g) + '" ontoggle="lembrarGrupo(\'' + alvo + '\',this)">'
+      + '<summary><span>' + esc(g) + '</span><span class="n">' + arr.length + '</span></summary>'
+      + '<div class="body">' + arr.map(linha).join('') + '</div></details>';
+  }).join('');
+}
+function lembrarGrupo(alvo, el) {
+  if (($(alvo === 'cat' ? 'buscaCat' : 'pkBusca').value || '').trim()) return;   // busca abre tudo; não grava
+  const g = el.dataset.g; if (el.open) _gAbertos[alvo].add(g); else _gAbertos[alvo].delete(g);
+}
 function renderCatalogo() {
-  const q = ($('buscaCat').value || '').toLowerCase();
-  const grupos = [['material', 'Materiais'], ['servico', 'Mão de obra / serviços']];
-  let html = '';
-  grupos.forEach(g => {
-    const arr = CAT.list.filter(c => c.cat === g[0] && (!q || c.desc.toLowerCase().indexOf(q) >= 0)).sort((a, b) => a.desc.localeCompare(b.desc, 'pt-BR'));
-    if (!arr.length) return;
-    html += '<div class="fld" style="margin-top:12px">' + g[1] + '</div>' + arr.map(c => '<div class="cat-row" onclick="editarItemCat(\'' + esc(c.id) + '\')">'
-      + '<div class="main">' + esc(c.desc) + '<div class="muted">por ' + esc(c.un) + '</div></div>'
-      + '<div class="p' + (c.preco ? '' : ' zero') + '">' + brl(c.preco) + '</div></div>').join('');
-  });
-  $('catLista').innerHTML = html || '<div class="empty">Nenhum item no catálogo.</div>';
+  const q = ($('buscaCat').value || '').toLowerCase().trim();
+  const html = htmlGrupos('cat', CAT.list, q, c => '<div class="cat-row" onclick="editarItemCat(\'' + esc(c.id) + '\')">'
+    + '<div class="main">' + esc(c.desc) + '<div class="muted">' + (c.cat === 'servico' ? 'Serviço' : 'Material') + ' · por ' + esc(c.un) + '</div></div>'
+    + '<div class="p' + (c.preco ? '' : ' zero') + '">' + brl(c.preco) + '</div></div>');
+  const semPreco = CAT.list.filter(c => !c.preco).length;
+  $('catLista').innerHTML = (semPreco ? '<p class="muted" style="margin-top:6px">' + semPreco + ' de ' + CAT.list.length + ' itens ainda sem preço.</p>' : '')
+    + (html || '<div class="empty">Nenhum item encontrado.</div>');
 }
 function editarItemCat(id) {
   catEditId = id;
-  const c = id ? CAT.list.find(x => x.id === id) : { desc: '', cat: 'material', un: 'un', preco: 0 };
+  const c = id ? CAT.list.find(x => x.id === id) : { desc: '', cat: 'material', un: 'un', preco: 0, grupo: '' };
   if (!c) return;
   $('mCatTit').textContent = id ? 'Editar item' : 'Novo item';
   $('ciDesc').value = c.desc; $('ciCat').value = c.cat; $('ciUn').value = c.un;
+  $('ciGrupo').value = id ? grupoDe(c) : '';
+  $('dlGrupos').innerHTML = Array.from(new Set(GRUPOS.concat(gruposOrdenados(CAT.list)))).map(g => '<option value="' + esc(g) + '">').join('');
   $('ciPreco').value = c.preco ? c.preco.toFixed(2).replace('.', ',') : '';
   $('ciDel').style.display = id ? '' : 'none';
   $('mCat').classList.add('open');
@@ -681,7 +838,9 @@ function salvarItemCat() {
   if (!desc) { showToast('Informe a descrição.'); return; }
   const preco = round2(num($('ciPreco').value));
   if (preco < 0) { showToast('Preço inválido.'); return; }
-  const item = { id: catEditId || uid(), desc, cat: $('ciCat').value, un: $('ciUn').value, preco };
+  const cat = $('ciCat').value;
+  const grupo = $('ciGrupo').value.trim() || (cat === 'servico' ? 'Outros serviços' : 'Outros materiais');
+  const item = { id: catEditId || uid(), desc, cat, un: $('ciUn').value, preco, grupo };
   const i = CAT.list.findIndex(x => x.id === item.id);
   if (i >= 0) CAT.list[i] = item; else CAT.list.push(item);
   persistCat(); fecharModal('mCat'); renderCatalogo(); showToast('Item salvo ✔');
@@ -690,6 +849,8 @@ function excluirItemCat() {
   if (!catEditId) return;
   if (!confirm('Excluir este item do catálogo? Orçamentos já feitos não são alterados.')) return;
   CAT.list = CAT.list.filter(x => x.id !== catEditId);
+  // item padrão excluído não volta em futuras atualizações do catálogo
+  if (CATALOGO_PADRAO.some(x => x.id === catEditId)) { CAT.removidos = (CAT.removidos || []).concat(catEditId); }
   persistCat(); fecharModal('mCat'); renderCatalogo();
 }
 
@@ -911,7 +1072,14 @@ function startCloudListeners() {
   }, err => { const c = (err && err.code) || ''; if (c.includes('permission-denied')) setSync('denied'); else setSync('error', c); }));
   cloudUnsub.push(FB.onSnapshot(FB.doc(FB.fs, COL_CFG, 'catalogo'), s => {
     const d = s.data();
-    if (d && Array.isArray(d.list) && (d.updatedAt || 0) >= (CAT.updatedAt || 0)) { CAT = d; saveCatLocal(); if ($('view-cat').classList.contains('active')) renderCatalogo(); }
+    if (d && Array.isArray(d.list) && (d.updatedAt || 0) >= (CAT.updatedAt || 0)) {
+      // Migra a versão da NUVEM (com os preços mais recentes) e grava só se veio do servidor
+      const mudou = migrarCatalogo(d);
+      CAT = d;
+      if (mudou && !s.metadata.fromCache) { CAT.updatedAt = Date.now(); FB.setDoc(FB.doc(FB.fs, COL_CFG, 'catalogo'), clone(CAT)).catch(onWriteError); }
+      saveCatLocal();
+      if ($('view-cat').classList.contains('active')) renderCatalogo();
+    }
     else if (!s.metadata.fromCache && (!s.exists() || (d && (d.updatedAt || 0) < (CAT.updatedAt || 0)))) FB.setDoc(FB.doc(FB.fs, COL_CFG, 'catalogo'), clone(CAT)).catch(() => {});
   }, () => {}));
   cloudUnsub.push(FB.onSnapshot(FB.doc(FB.fs, COL_CFG, 'empresa'), s => {

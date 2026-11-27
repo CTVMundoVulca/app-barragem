@@ -175,6 +175,7 @@ html[data-dark="1"] .ds-resumo b { color: #fff; }
 <div id="view-editor" class="view">
   <div class="card">
     <div class="section-title">Orçamento <span id="edNum" style="float:right"></span></div>
+    <p class="muted" id="autoInfo" style="margin:-4px 0 4px">Salvo automaticamente enquanto você preenche.</p>
     <div class="row">
       <div><label class="fld">Data</label><input type="date" id="edData"></div>
       <div><label class="fld">Validade (dias)</label><input type="number" inputmode="numeric" min="1" id="edValidade"></div>
@@ -760,8 +761,8 @@ function onWriteError(err) {
 
 /* ══════════════ navegação ══════════════ */
 function showTab(v) {
-  if (cur && !confirmarSaida()) return;
-  cur = null;
+  if (cur) autoSalvar();
+  cur = null; lembrarEdicao(null);
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   $('view-' + v).classList.add('active');
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
@@ -771,9 +772,38 @@ function showTab(v) {
   if (v === 'emp') renderEmpresa();
   window.scrollTo(0, 0);
 }
-function confirmarSaida() {
-  if (!formDirty) return true;
-  return confirm('Há alterações não salvas neste orçamento. Sair mesmo assim?');
+/* ══════════════ salvamento automático (rascunho) ══════════════
+   Tudo o que é digitado no orçamento é gravado sozinho: 1,5 s depois da última alteração
+   e, na hora, quando o app vai para segundo plano (trocar de app, bloquear a tela, fechar).
+   Orçamento novo sem número fica na lista como "Rascunho"; o número é dado ao Salvar/PDF/WhatsApp. */
+let _autoT = null;
+function marcarAlterado() { formDirty = true; clearTimeout(_autoT); _autoT = setTimeout(autoSalvar, 1500); }
+function temConteudo(o) {
+  const c = o.cliente || {};
+  return !!(c.nome || c.tel || c.doc || c.end || o.servico || (o.itens && o.itens.length) || (o.desloc && num(o.desloc.km) > 0) || o.obs);
+}
+function autoSalvar() {
+  clearTimeout(_autoT); _autoT = null;
+  if (!cur || !formDirty || !$('view-editor').classList.contains('active')) return;
+  lerForm();
+  if (cur._novo && !temConteudo(cur)) return;          // orçamento novo ainda vazio: nada a guardar
+  delete cur._novo;
+  cur.updatedAt = Date.now();
+  persistOrc(clone(cur));
+  formDirty = false;
+  lembrarEdicao(cur.id);
+  $('btnExcluir').style.display = '';
+  $('autoInfo').textContent = '✓ Salvo automaticamente às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + (cur.numero ? '' : ' (rascunho)');
+}
+/* Guarda qual orçamento estava aberto, para reabrir se o sistema fechar o app em segundo plano */
+function lembrarEdicao(id) { try { if (id) localStorage.setItem('barragem_editando', id); else localStorage.removeItem('barragem_editando'); } catch (e) {} }
+function reabrirEdicao() {
+  let id = null; try { id = localStorage.getItem('barragem_editando'); } catch (e) {}
+  if (!id) return;
+  const o = ORCS.find(x => x.id === id);
+  if (!o) { lembrarEdicao(null); return; }
+  abrirOrcamento(id);
+  showToast('Orçamento em andamento recuperado ✔');
 }
 function fecharModal(id) { $(id).classList.remove('open'); }
 
@@ -802,7 +832,7 @@ function renderList() {
   el.innerHTML = arr.map(o => {
     const t = totaisDe(o);
     return '<div class="orc-item" onclick="abrirOrcamento(\'' + esc(o.id) + '\')">'
-      + '<div class="main"><div class="num">' + esc(o.numero) + ' · ' + esc(fmtData(o.data)) + '</div>'
+      + '<div class="main"><div class="num">' + esc(o.numero || 'Sem nº') + ' · ' + esc(fmtData(o.data)) + '</div>'
       + '<div class="cli">' + esc((o.cliente && o.cliente.nome) || 'Sem cliente') + '</div>'
       + '<div class="sub">' + esc(o.servico || '') + '</div>'
       + (_pending.has(o.id) && MODE === 'cloud' ? '<div class="pend">● aguardando sincronizar</div>' : '')
@@ -835,7 +865,8 @@ function abrirEditor() {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   $('view-editor').classList.add('active');
   $('tabs').style.display = 'none'; $('btnBack').style.display = '';
-  $('edNum').textContent = cur.numero || 'novo';
+  $('edNum').textContent = cur.numero || (cur._novo ? 'novo' : 'rascunho');
+  $('autoInfo').textContent = 'Salvo automaticamente enquanto você preenche.';
   $('edData').value = cur.data || hojeISO();
   $('edValidade').value = cur.validade || '';
   $('edStatus').value = cur.status || 'rascunho';
@@ -861,6 +892,7 @@ function abrirEditor() {
   $('btnExcluir').style.display = cur._novo ? 'none' : '';
   renderItens();
   formDirty = false;
+  if (!cur._novo) lembrarEdicao(cur.id);
   window.scrollTo(0, 0);
 }
 function lerForm() {
@@ -886,7 +918,8 @@ function validar() {
 function salvarAtual(avisar) {
   if (!cur) return false;
   lerForm();
-  if (!validar()) return false;
+  // faltou algum dado obrigatório: o que já foi preenchido fica guardado como rascunho
+  if (!validar()) { formDirty = true; autoSalvar(); return false; }
   if (!cur.numero) cur.numero = proximoNumero(cur.data.slice(0, 4));
   delete cur._novo;
   cur.updatedAt = Date.now();
@@ -894,24 +927,27 @@ function salvarAtual(avisar) {
   formDirty = false;
   $('edNum').textContent = cur.numero;
   $('btnExcluir').style.display = '';
+  lembrarEdicao(cur.id);
+  $('autoInfo').textContent = '✓ Salvo às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   if (avisar) showToast('Orçamento ' + cur.numero + ' salvo ✔');
   return true;
 }
 function fecharEditor() {
-  if (!confirmarSaida()) return;
+  autoSalvar();
   formDirty = false; cur = null; showTab('list');
 }
 function excluirAtual() {
   if (!cur || cur._novo) return;
-  if (!confirm('Excluir o orçamento ' + cur.numero + '? Esta ação não pode ser desfeita.')) return;
-  removeOrc(cur.id); formDirty = false; cur = null; showTab('list'); showToast('Orçamento excluído.');
+  if (!confirm('Excluir ' + (cur.numero ? 'o orçamento ' + cur.numero : 'este rascunho') + '? Esta ação não pode ser desfeita.')) return;
+  clearTimeout(_autoT); removeOrc(cur.id); formDirty = false; cur = null; lembrarEdicao(null); showTab('list'); showToast('Orçamento excluído.');
 }
 function duplicarAtual() {
   if (!cur) return;
+  autoSalvar();
   lerForm();
   const c = clone(cur);
   c.id = uid(); c.numero = ''; c.data = hojeISO(); c.status = 'rascunho'; c.createdAt = Date.now(); c.updatedAt = 0; c._novo = true;
-  cur = c; abrirEditor(); formDirty = true; showToast('Cópia criada — revise e salve.');
+  cur = c; abrirEditor(); marcarAlterado(); showToast('Cópia criada — ela também é salva automaticamente.');
 }
 
 /* itens */
@@ -926,8 +962,8 @@ function renderItens() {
     + '<button class="rm" onclick="removerItem(' + i + ')" aria-label="Remover">×</button></div>').join('');
   calcTotais();
 }
-function mudarQtd(i, v) { const q = num(v); if (q <= 0) { showToast('Quantidade deve ser maior que zero.'); renderItens(); return; } cur.itens[i].qtd = q; formDirty = true; renderItens(); }
-function removerItem(i) { cur.itens.splice(i, 1); formDirty = true; renderItens(); }
+function mudarQtd(i, v) { const q = num(v); if (q <= 0) { showToast('Quantidade deve ser maior que zero.'); renderItens(); return; } cur.itens[i].qtd = q; marcarAlterado(); renderItens(); }
+function removerItem(i) { cur.itens.splice(i, 1); marcarAlterado(); renderItens(); }
 function lerDesloc() {
   if (!cur) return;
   const d = cur.desloc || (cur.desloc = Object.assign({}, paramsDesloc()));
@@ -958,11 +994,11 @@ function preencherSelectVeiculo() {
 }
 function trocarVeiculo() {
   if (!cur) return;
-  lerDesloc(); Object.assign(cur.desloc, paramsDesloc($('dsVeic').value)); formDirty = true; calcTotais();
+  lerDesloc(); Object.assign(cur.desloc, paramsDesloc($('dsVeic').value)); marcarAlterado(); calcTotais();
 }
 function atualizarCustosVeiculo() {
   if (!cur) return;
-  lerDesloc(); Object.assign(cur.desloc, paramsDesloc(cur.desloc.veicId)); formDirty = true; preencherSelectVeiculo(); calcTotais();
+  lerDesloc(); Object.assign(cur.desloc, paramsDesloc(cur.desloc.veicId)); marcarAlterado(); preencherSelectVeiculo(); calcTotais();
   showToast('Custos do veículo atualizados neste orçamento.');
 }
 function abrirRota() {
@@ -1000,7 +1036,7 @@ function confirmarPicker() {
   const ex = cur.itens.find(it => it.catId === c.id && num(it.preco) === num(c.preco));
   if (ex) ex.qtd = round2(num(ex.qtd) + q);
   else cur.itens.push({ catId: c.id, desc: c.desc, cat: c.cat, un: c.un, preco: num(c.preco), qtd: q, grupo: grupoDe(c) });
-  formDirty = true; fecharModal('mPicker'); renderItens();
+  marcarAlterado(); fecharModal('mPicker'); renderItens();
 }
 
 /* ══════════════ catálogo ══════════════ */
@@ -1437,10 +1473,15 @@ function logout() { if (FB && confirm('Sair da conta?')) FB.signOut(FB.auth); }
     const rd = new FileReader(); rd.onload = () => { LOGO_PADRAO = rd.result; }; rd.readAsDataURL(b);
   }).catch(() => {});
 })();
-$('view-editor').addEventListener('input', () => { formDirty = true; });
-window.addEventListener('beforeunload', e => { if (cur && formDirty) { e.preventDefault(); e.returnValue = ''; } });
+$('view-editor').addEventListener('input', () => { if (cur) marcarAlterado(); });
+$('view-editor').addEventListener('change', () => { if (cur) marcarAlterado(); });
+// saiu do app (trocou de app, bloqueou a tela, fechou): grava na hora, sem esperar
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autoSalvar(); });
+window.addEventListener('pagehide', autoSalvar);
+window.addEventListener('beforeunload', autoSalvar);
 window.__BARRAGEM = { wantCloud: isConfigured(), bootLocal, upgradeToCloud, firebaseConfig };
 bootLocal();   // sempre inicia local primeiro — upgrade para nuvem em background
+reabrirEdicao(); // o sistema fechou o app com um orçamento aberto: volta para ele
 </script>
 <script type="module">
   const R = window.__BARRAGEM;

@@ -446,7 +446,7 @@ const LS = {
 /* Catálogo padrão por grupos — SEM preço: o preço de venda é da empresa e deve
    ser preenchido no app. IDs fixos: NUNCA reutilizar nem renumerar (a migração
    usa o id para saber o que já existe; itens excluídos pelo usuário não voltam). */
-const CAT_SEED_VERSION = 2;
+const CAT_SEED_VERSION = 3;
 const GRUPOS = [
   'Ar-condicionado — instalação',
   'Ar-condicionado — manutenção',
@@ -552,20 +552,37 @@ const CATALOGO_PADRAO = [
   ['e320', G.ELMAT, M, 'un',   'Haste de aterramento'],
   ['e321', G.ELMAT, M, 'un',   'Conector de emenda'],
   ['e322', G.ELMAT, M, 'rolo', 'Fita isolante'],
+  // v3 — itens do orçamento à mão da empresa (preços da loja onde o eletricista compra, 27/11/2026)
+  ['e323', G.ELMAT, M, 'un',   'Barramento pente monofásico', 39.00],
+  ['e324', G.ELMAT, M, 'un',   'Barramento pente bifásico', 57.00],
+  ['e325', G.ELMAT, M, 'un',   'Tomada dupla 10 A', 12.15],
+  ['e326', G.ELMAT, M, 'un',   'Tomada dupla para condulete com tampa', 12.60],
+  ['e327', G.ELMAT, M, 'un',   'Disjuntor monopolar 32 A', 10.00],
+  ['e328', G.ELMAT, M, 'un',   'Disjuntor monopolar 50 A', 17.00],
+  ['e329', G.ELMAT, M, 'pç',   'Eletroduto rígido PVC cinza 3/4" (barra)', 15.00],
+  ['e330', G.ELMAT, M, 'un',   'Condulete 3/4" cinza', 7.00],
+  ['e331', G.ELMAT, M, 'un',   'Adaptador para condulete 3/4"', 2.00],
+  ['e332', G.ELMAT, M, 'un',   'Abraçadeira 3/4"', 2.00],
   // Deslocamento e outros
   ['o101', G.OUT, S, 'vb',    'Taxa de deslocamento'],
   ['o102', G.OUT, S, 'vb',    'Andaime ou escada especial'],
   ['o103', G.OUT, M, 'vb',    'Material de consumo (fixações, terminais, etc.)']
-].map(([id, grupo, cat, un, desc]) => ({ id, grupo, cat, un, desc, preco: 0 }));
+].map(([id, grupo, cat, un, desc, preco]) => ({ id, grupo, cat, un, desc, preco: preco || 0 }));
+/* v3 — preços (loja do eletricista, 27/11/2026) para itens que já existiam. Só preenchem itens
+   que ainda estão em R$ 0,00: preço que a empresa já cadastrou NUNCA é substituído. */
+const PRECOS_V3 = { e313: 11.82, e310: 2.77, e311: 4.90, e312: 6.82, e322: 31.80, e321: 5.20, e302: 9.50 };
+CATALOGO_PADRAO.forEach(i => { if (PRECOS_V3[i.id] && !i.preco) i.preco = PRECOS_V3[i.id]; });
 const GRUPO_LEGADO = { c1: G.ACMAT, c2: G.ACMAT, c3: G.ELMAT, c4: G.ACI };
 function grupoDe(c) { return c.grupo || GRUPO_LEGADO[c.id] || (c.cat === 'servico' ? 'Outros serviços' : 'Outros materiais'); }
 /* Acrescenta ao catálogo os itens padrão que ainda não existem e dá grupo aos antigos.
-   Nunca altera preço, descrição ou unidade de itens existentes; não devolve itens que
+   Nunca altera descrição ou unidade de itens existentes, nem um preço já cadastrado (só preenche R$ 0,00); não devolve itens que
    o usuário excluiu (lista "removidos"). Retorna true se mudou algo. */
 function migrarCatalogo(c) {
   let mudou = false;
   if (!Array.isArray(c.list)) { c.list = []; mudou = true; }
-  if ((c.seedVersion || 1) < CAT_SEED_VERSION) {
+  const versao = c.seedVersion || 1;
+  if (versao < CAT_SEED_VERSION) {
+    if (versao < 3) c.list.forEach(i => { if (PRECOS_V3[i.id] && !num(i.preco)) i.preco = PRECOS_V3[i.id]; });
     const ids = new Set(c.list.map(i => i.id));
     const removidos = new Set(c.removidos || []);
     CATALOGO_PADRAO.forEach(i => { if (!ids.has(i.id) && !removidos.has(i.id)) c.list.push(clone(i)); });

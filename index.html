@@ -201,9 +201,16 @@ html[data-dark="1"] .ds-resumo b { color: #fff; }
   </div>
 
   <div class="card">
-    <div class="section-title">Materiais e mão de obra</div>
+    <div class="section-title">Materiais</div>
     <div id="edItens"></div>
-    <button class="btn btn-primary btn-block" onclick="abrirPicker()">+ Adicionar item do catálogo</button>
+    <button class="btn btn-primary btn-block" onclick="abrirPicker()">+ Adicionar material do catálogo</button>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Mão de obra</div>
+    <p class="muted">Informe o valor depois de somar os materiais. Total de materiais até aqui: <b id="moMat">R$ 0,00</b></p>
+    <label class="fld">Valor da mão de obra (R$)</label>
+    <input id="edMaoObra" inputmode="decimal" placeholder="0,00" oninput="calcTotais()">
   </div>
 
   <div class="card">
@@ -227,7 +234,7 @@ html[data-dark="1"] .ds-resumo b { color: #fff; }
     <div class="section-title">Totais</div>
     <div>
       <div class="tot"><span>Materiais</span><span id="tMat">—</span></div>
-      <div class="tot"><span>Mão de obra / serviços</span><span id="tSrv">—</span></div>
+      <div class="tot"><span>Mão de obra</span><span id="tSrv">—</span></div>
       <div class="tot"><span>Deslocamento</span><span id="tDesl">—</span></div>
       <div class="tot"><span>Subtotal</span><span id="tSub">—</span></div>
       <div class="row" style="align-items:flex-end">
@@ -263,7 +270,7 @@ html[data-dark="1"] .ds-resumo b { color: #fff; }
 <div id="view-cat" class="view">
   <div class="card">
     <div class="section-title">Catálogo de itens</div>
-    <p class="muted" style="margin-bottom:8px">Itens separados por grupo. Toque no grupo para abrir e no item para editar o preço, o nome ou o grupo. Itens com preço R$ 0,00 aparecem em vermelho. Use o <b>+</b> para incluir um item novo.</p>
+    <p class="muted" style="margin-bottom:8px">Materiais e ferramentas, separados por grupo. A mão de obra é informada em cada orçamento. Toque no grupo para abrir e no item para editar o preço, o nome ou o grupo. Itens com preço R$ 0,00 aparecem em vermelho. Use o <b>+</b> para incluir um item novo.</p>
     <input id="buscaCat" placeholder="Buscar item" oninput="renderCatalogo()">
     <div id="catLista" style="margin-top:6px"></div>
   </div>
@@ -376,7 +383,7 @@ html[data-dark="1"] .ds-resumo b { color: #fff; }
     <label class="fld">Descrição *</label><input id="ciDesc" placeholder='Ex.: Tubulação de cobre 1/4" + 3/8" (par)'>
     <label class="fld">Grupo</label><input id="ciGrupo" list="dlGrupos" placeholder="Escolha ou digite um grupo novo"><datalist id="dlGrupos"></datalist>
     <div class="row">
-      <div><label class="fld">Tipo</label><select id="ciCat"><option value="material">Material</option><option value="servico">Mão de obra / serviço</option></select></div>
+      <div style="display:none"><select id="ciCat"><option value="material">Material</option></select></div>
       <div><label class="fld">Unidade</label><select id="ciUn">
         <option value="m">m (metro)</option><option value="un">un (unidade)</option><option value="pç">pç (peça)</option><option value="par">par</option><option value="cx">cx (caixa)</option><option value="rolo">rolo</option><option value="kg">kg</option><option value="h">h (hora)</option><option value="serv.">serviço</option><option value="pt">pt (ponto)</option><option value="kit">kit</option><option value="vb">vb (verba)</option>
       </select></div>
@@ -447,7 +454,7 @@ const LS = {
 /* Catálogo padrão por grupos — SEM preço: o preço de venda é da empresa e deve
    ser preenchido no app. IDs fixos: NUNCA reutilizar nem renumerar (a migração
    usa o id para saber o que já existe; itens excluídos pelo usuário não voltam). */
-const CAT_SEED_VERSION = 3;
+const CAT_SEED_VERSION = 4;
 const GRUPOS = [
   'Ar-condicionado — instalação',
   'Ar-condicionado — manutenção',
@@ -566,9 +573,13 @@ const CATALOGO_PADRAO = [
   ['e332', G.ELMAT, M, 'un',   'Abraçadeira 3/4"', 2.00],
   // Deslocamento e outros
   ['o101', G.OUT, S, 'vb',    'Taxa de deslocamento'],
-  ['o102', G.OUT, S, 'vb',    'Andaime ou escada especial'],
-  ['o103', G.OUT, M, 'vb',    'Material de consumo (fixações, terminais, etc.)']
-].map(([id, grupo, cat, un, desc, preco]) => ({ id, grupo, cat, un, desc, preco: preco || 0 }));
+  ['o102', 'Ferramentas e equipamentos', M, 'vb', 'Andaime ou escada especial'],
+  ['o103', 'Outros materiais', M, 'vb',    'Material de consumo (fixações, terminais, etc.)']
+].map(([id, grupo, cat, un, desc, preco]) => ({ id, grupo, cat, un, desc, preco: preco || 0 }))
+ // v4: a mão de obra deixou de ser item do catálogo (é informada em cada orçamento)
+ .filter(i => i.cat === M);
+/* Ordem dos grupos na tela (v4: só materiais e ferramentas) */
+const ORDEM_GRUPOS = ['Ar-condicionado — materiais', 'Elétrica — materiais', 'Ferramentas e equipamentos', 'Outros materiais'];
 /* v3 — preços (loja do eletricista, 27/11/2026) para itens que já existiam. Só preenchem itens
    que ainda estão em R$ 0,00: preço que a empresa já cadastrou NUNCA é substituído. */
 const PRECOS_V3 = { e313: 11.82, e310: 2.77, e311: 4.90, e312: 6.82, e322: 31.80, e321: 5.20, e302: 9.50 };
@@ -587,6 +598,21 @@ function migrarCatalogo(c) {
     const ids = new Set(c.list.map(i => i.id));
     const removidos = new Set(c.removidos || []);
     CATALOGO_PADRAO.forEach(i => { if (!ids.has(i.id) && !removidos.has(i.id)) c.list.push(clone(i)); });
+    if (versao < 4) {
+      // Mão de obra sai do catálogo. Os itens de serviço NÃO são apagados: ficam guardados em
+      // "servicosArquivados" no próprio catálogo (recuperáveis) e não voltam em atualizações.
+      const arq = [];
+      c.list = c.list.filter(i => {
+        if (i.id === 'o102') { i.cat = 'material'; i.grupo = 'Ferramentas e equipamentos'; return true; }
+        if (i.cat === 'servico') { arq.push(i); return false; }
+        if (i.grupo === 'Deslocamento e outros') i.grupo = 'Outros materiais';
+        return true;
+      });
+      if (arq.length) {
+        c.servicosArquivados = (c.servicosArquivados || []).concat(arq);
+        c.removidos = Array.from(new Set((c.removidos || []).concat(arq.map(i => i.id))));
+      }
+    }
     c.seedVersion = CAT_SEED_VERSION; mudou = true;
   }
   c.list.forEach(i => { if (!i.grupo) { i.grupo = grupoDe(i); mudou = true; } });
@@ -594,8 +620,8 @@ function migrarCatalogo(c) {
 }
 function gruposOrdenados(list) {
   const set = new Set(list.map(grupoDe));
-  const ord = GRUPOS.filter(g => set.has(g));
-  Array.from(set).filter(g => GRUPOS.indexOf(g) < 0).sort((a, b) => a.localeCompare(b, 'pt-BR')).forEach(g => ord.push(g));
+  const ord = ORDEM_GRUPOS.filter(g => set.has(g));
+  Array.from(set).filter(g => ORDEM_GRUPOS.indexOf(g) < 0).sort((a, b) => a.localeCompare(b, 'pt-BR')).forEach(g => ord.push(g));
   return ord;
 }
 /* Veículos: qualquer tipo e combustível. Começa com o que o dono informou (Fiat Strada 2010,
@@ -780,7 +806,7 @@ let _autoT = null;
 function marcarAlterado() { formDirty = true; clearTimeout(_autoT); _autoT = setTimeout(autoSalvar, 1500); }
 function temConteudo(o) {
   const c = o.cliente || {};
-  return !!(c.nome || c.tel || c.doc || c.end || o.servico || (o.itens && o.itens.length) || (o.desloc && num(o.desloc.km) > 0) || o.obs);
+  return !!(c.nome || c.tel || c.doc || c.end || o.servico || (o.itens && o.itens.length) || num(o.maoObra) > 0 || (o.desloc && num(o.desloc.km) > 0) || o.obs);
 }
 function autoSalvar() {
   clearTimeout(_autoT); _autoT = null;
@@ -811,6 +837,7 @@ function fecharModal(id) { $(id).classList.remove('open'); }
 function totaisDe(o) {
   let mat = 0, srv = 0;
   (o.itens || []).forEach(it => { const v = round2(num(it.qtd) * num(it.preco)); if (it.cat === 'servico') srv += v; else mat += v; });
+  srv += Math.max(0, num(o.maoObra));   // mão de obra informada no orçamento (+ itens de serviço de orçamentos antigos)
   const desl = calcDesloc(o.desloc).valor;
   const sub = round2(mat + srv + desl);
   let desc = num(o.desconto);
@@ -881,6 +908,7 @@ function abrirEditor() {
   $('edPrazo').value = cur.prazo || '';
   $('edGarantia').value = cur.garantia || '';
   $('edObs').value = cur.obs || '';
+  $('edMaoObra').value = num(cur.maoObra) ? num(cur.maoObra).toFixed(2).replace('.', ',') : '';
   // orçamentos antigos não têm deslocamento: começa zerado (não muda o total)
   if (!cur.desloc) cur.desloc = Object.assign({ km: 0, min: 0, viagens: 1, idaVolta: true }, paramsDesloc());
   const d = cur.desloc;
@@ -907,12 +935,13 @@ function lerForm() {
   cur.prazo = $('edPrazo').value.trim();
   cur.garantia = $('edGarantia').value.trim();
   cur.obs = $('edObs').value.trim();
+  cur.maoObra = round2(Math.max(0, num($('edMaoObra').value)));
   lerDesloc();
 }
 function validar() {
   if (!cur.cliente.nome) { showToast('Informe o nome do cliente.'); $('edCliNome').focus(); return false; }
   if (!cur.servico) { showToast('Descreva o serviço.'); $('edServico').focus(); return false; }
-  if (!cur.itens.length) { showToast('Adicione ao menos um item.'); return false; }
+  if (!cur.itens.length && !(num(cur.maoObra) > 0)) { showToast('Adicione materiais ou informe a mão de obra.'); return false; }
   return true;
 }
 function salvarAtual(avisar) {
@@ -1010,8 +1039,10 @@ function abrirRota() {
 function calcTotais() {
   if (!cur) return;
   cur.desconto = num($('edDesc').value); cur.descTipo = $('edDescTipo').value;
+  cur.maoObra = round2(Math.max(0, num($('edMaoObra').value)));
   lerDesloc(); resumoDesloc();
   const t = totaisDe(cur);
+  $('moMat').textContent = brl(t.mat);
   $('tMat').textContent = brl(t.mat); $('tSrv').textContent = brl(t.srv); $('tDesl').textContent = brl(t.desl); $('tSub').textContent = brl(t.sub);
   $('tDesc').textContent = t.desc ? '− ' + brl(t.desc) : brl(0); $('tTot').textContent = brl(t.total);
 }
@@ -1073,7 +1104,7 @@ function editarItemCat(id) {
   $('mCatTit').textContent = id ? 'Editar item' : 'Novo item';
   $('ciDesc').value = c.desc; $('ciCat').value = c.cat; $('ciUn').value = c.un;
   $('ciGrupo').value = id ? grupoDe(c) : '';
-  $('dlGrupos').innerHTML = Array.from(new Set(GRUPOS.concat(gruposOrdenados(CAT.list)))).map(g => '<option value="' + esc(g) + '">').join('');
+  $('dlGrupos').innerHTML = Array.from(new Set(ORDEM_GRUPOS.concat(gruposOrdenados(CAT.list)))).map(g => '<option value="' + esc(g) + '">').join('');
   $('ciPreco').value = c.preco ? c.preco.toFixed(2).replace('.', ',') : '';
   $('ciDel').style.display = id ? '' : 'none';
   $('mCat').classList.add('open');
@@ -1206,7 +1237,8 @@ function relatorioHTML(o) {
   const t = totaisDe(o);
   const linhas = (cat) => o.itens.filter(it => (it.cat === 'servico') === (cat === 'servico')).map(it =>
     '<tr><td>' + esc(it.desc) + '</td><td class="c">' + esc(fmtQtd(it.qtd)) + ' ' + esc(it.un) + '</td><td class="r">' + brl(it.preco) + '</td><td class="r">' + brl(round2(num(it.qtd) * num(it.preco))) + '</td></tr>').join('');
-  const mat = linhas('material'), srv = linhas('servico');
+  const mat = linhas('material');
+  const srv = linhas('servico') + (num(o.maoObra) > 0 ? '<tr><td>Mão de obra</td><td class="c">—</td><td class="r">—</td><td class="r">' + brl(o.maoObra) + '</td></tr>' : '');
   const cab = '<tr><th>Descrição</th><th class="c">Qtd.</th><th class="r">Valor unit.</th><th class="r">Total</th></tr>';
   const logo = EMP.logo || LOGO_PADRAO;
   const dsl = calcDesloc(o.desloc);
@@ -1243,13 +1275,13 @@ function relatorioHTML(o) {
     + (o.cliente.end ? '<div style="grid-column:1/-1"><b>Endereço:</b> ' + esc(o.cliente.end) + '</div>' : '') + '</div></div>'
     + '<div class="box"><h4>Serviço</h4><div class="obs">' + esc(o.servico) + '</div></div>'
     + (mat ? '<div class="sec">Materiais</div><table>' + cab + mat + '</table>' : '')
-    + (srv ? '<div class="sec">Mão de obra / serviços</div><table>' + cab + srv + '</table>' : '')
+    + (srv ? '<div class="sec">Mão de obra</div><table>' + cab + srv + '</table>' : '')
     + (t.desl ? '<div class="sec">Deslocamento</div><table><tr><th>Descrição</th><th class="c">Distância</th><th class="r">Total</th></tr><tr><td>Deslocamento até o local do serviço'
         + (dsl.mult > 1 ? ' (' + [o.desloc.idaVolta === false ? 'só ida' : 'ida e volta', (o.desloc.viagens > 1 ? o.desloc.viagens + ' viagens' : '')].filter(Boolean).join(', ') + ')' : '')
         + '</td><td class="c">' + fmtQtd(dsl.km) + ' km</td><td class="r">' + brl(t.desl) + '</td></tr></table>' : '')
     + '<table class="tot">'
     + (mat ? '<tr><td>Materiais</td><td class="r">' + brl(t.mat) + '</td></tr>' : '')
-    + (srv ? '<tr><td>Mão de obra / serviços</td><td class="r">' + brl(t.srv) + '</td></tr>' : '')
+    + (srv ? '<tr><td>Mão de obra</td><td class="r">' + brl(t.srv) + '</td></tr>' : '')
     + (t.desl ? '<tr><td>Deslocamento</td><td class="r">' + brl(t.desl) + '</td></tr>' : '')
     + (t.desc ? '<tr><td>Subtotal</td><td class="r">' + brl(t.sub) + '</td></tr><tr><td>Desconto' + (o.descTipo === 'pct' ? ' (' + fmtQtd(o.desconto) + '%)' : '') + '</td><td class="r">− ' + brl(t.desc) + '</td></tr>' : '')
     + '<tr class="f"><td>TOTAL</td><td class="r">' + brl(t.total) + '</td></tr></table>'
@@ -1282,7 +1314,8 @@ function textoWhatsApp(o) {
     L.push(''); L.push('*' + tit + '*');
     arr.forEach(it => L.push('• ' + it.desc + ' — ' + fmtQtd(it.qtd) + ' ' + it.un + ' × ' + brl(it.preco) + ' = ' + brl(round2(num(it.qtd) * num(it.preco)))));
   };
-  bloco('material', 'Materiais'); bloco('servico', 'Mão de obra / serviços');
+  bloco('material', 'Materiais'); bloco('servico', 'Mão de obra');
+  if (num(o.maoObra) > 0) { if (!o.itens.some(it => it.cat === 'servico')) { L.push(''); L.push('*Mão de obra*'); } L.push('• Mão de obra = ' + brl(o.maoObra)); }
   if (t.desl) { L.push(''); L.push('*Deslocamento*'); L.push('• ' + fmtQtd(calcDesloc(o.desloc).km) + ' km = ' + brl(t.desl)); }
   L.push('');
   if (t.desc) { L.push('Subtotal: ' + brl(t.sub)); L.push('Desconto: − ' + brl(t.desc)); }
